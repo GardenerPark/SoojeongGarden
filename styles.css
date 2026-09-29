@@ -105,3 +105,5 @@ legend { margin-bottom: 6px; }
   background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: .9rem;
   max-width: calc(100% - 32px);
 }
+label .row input { flex: 1; min-width: 0; margin-top: 4px; }
+label .row button { margin-top: 4px; white-space: nowrap; }

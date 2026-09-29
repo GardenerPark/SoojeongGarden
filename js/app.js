@@ -1,5 +1,6 @@
 import { SPACES, routeIntent, suggestFocus, sharedContext, localDate, reflectionDraft } from './rules.js';
 import { load, save, uid } from './store.js';
+import { loadStatus, aiStatus, ask } from './ai.js';
 
 const state = load();
 const $app = document.getElementById('app');
@@ -37,6 +38,13 @@ function contextNote(space) {
 // ---------- 입구 ----------
 let pendingRoute = null;
 
+function routeBasis(r) {
+  if (r.reason === '직접 선택') return '직접 선택';
+  if (r.reason) return `AI 판단: ${esc(r.reason)}`;
+  const kw = r.matched ? `‘${esc(r.matched)}’로 판단` : '규칙으로 판단';
+  return r.checking ? `${kw} · AI 확인 중…` : kw;
+}
+
 function viewHome() {
   const c = latestCheckin();
   const open = state.parked.filter((p) => !p.done);
@@ -46,7 +54,7 @@ function viewHome() {
     return `<section class="card route">
       <p class="eyebrow">연결 제안</p>
       <h3>${esc(s.label)}${s.ready ? ' 공간으로 연결할게요' : '에게 맡겨둘까요?'}</h3>
-      <p class="muted">“${esc(pendingRoute.text)}”${pendingRoute.matched ? ` · ‘${esc(pendingRoute.matched)}’로 판단` : ''}</p>
+      <p class="muted">“${esc(pendingRoute.text)}” · ${routeBasis(pendingRoute)}</p>
       ${items.length ? `<p class="small">전달할 정보: ${items.map((i) => esc(i.text)).join(', ')}</p>` : ''}
       <div class="row">
         ${s.ready ? `<button class="primary" data-act="go" data-space="${pendingRoute.space}">${esc(s.purpose)}</button>` : ''}
@@ -66,6 +74,7 @@ function viewHome() {
         <input name="text" placeholder="예: 일 시작해야 하는데 너무 피곤해" autocomplete="off" required />
         <button class="primary">연결</button>
       </form>
+      <p class="small muted">AI: ${esc(aiStatus().label)}${aiStatus().enabled ? '' : ' · 키워드 규칙으로 연결해요'}</p>
     </section>
     ${route || ''}
     <section class="grid">
@@ -139,7 +148,9 @@ function viewFocus() {
     </header>
     <form data-form="focus-start" class="card">
       <label>오늘 가장 중요한 일<input name="task" required autocomplete="off" value="${esc(todayTask() || '')}" placeholder="예: 제안서 작성" /></label>
-      <label>첫 행동 <span class="muted small">${esc(sug.hint)}</span><input name="step" required autocomplete="off" placeholder="예: 핵심 문장 세 개 쓰기" /></label>
+      <label>첫 행동 <span class="muted small">${esc(sug.hint)}</span>
+        <span class="row"><input name="step" required autocomplete="off" placeholder="예: 핵심 문장 세 개 쓰기" />
+        ${aiStatus().enabled ? '<button type="button" data-act="ai-step">AI로 줄이기</button>' : ''}</span></label>
       <fieldset class="scale"><legend>시간</legend>
         ${[10, 15, 25].map((m) => `<label><input type="radio" name="minutes" value="${m}" ${m === sug.minutes ? 'checked' : ''} /><span>${m}분</span></label>`).join('')}
       </fieldset>
@@ -203,8 +214,17 @@ $app.addEventListener('submit', (e) => {
   switch (f.dataset.form) {
     case 'intent': {
       const text = fd.get('text').trim();
-      pendingRoute = { text, ...routeIntent(text) };
-      return render();
+      const ai = aiStatus().enabled;
+      pendingRoute = { text, ...routeIntent(text), checking: ai };
+      render();
+      if (ai) {
+        ask('route', { text }).then((r) => {
+          if (pendingRoute?.text !== text) return; // 그사이 다른 요청을 했으면 무시
+          pendingRoute = r ? { text, space: r.space, reason: r.reason } : { ...pendingRoute, checking: false };
+          if (currentView() === 'home') render();
+        });
+      }
+      return;
     }
     case 'checkin':
       state.checkins.push({
@@ -266,6 +286,20 @@ $app.addEventListener('click', (e) => {
       if (p) p.done = true;
       return commit();
     }
+    case 'ai-step': {
+      const form = b.closest('form');
+      const task = form.task.value.trim();
+      if (!task) { form.task.focus(); return toast('중요한 일을 먼저 적어주세요.'); }
+      b.disabled = true;
+      b.textContent = '생각 중…';
+      ask('firstStep', { task, energy: latestCheckin()?.energy ?? null, minutes: Number(new FormData(form).get('minutes')) })
+        .then((r) => {
+          b.disabled = false;
+          b.textContent = 'AI로 줄이기';
+          if (r) { form.step.value = r.step; form.step.focus(); } else toast('AI 제안을 받지 못했어요. 직접 적어주세요.');
+        });
+      return;
+    }
     case 'focus-end':
       focusStage = 'review';
       return render();
@@ -274,7 +308,7 @@ $app.addEventListener('click', (e) => {
 
 $app.addEventListener('change', (e) => {
   if (e.target.dataset.act === 'reroute' && e.target.value && pendingRoute) {
-    pendingRoute = { ...pendingRoute, space: e.target.value, matched: null };
+    pendingRoute = { text: pendingRoute.text, space: e.target.value, matched: null, reason: '직접 선택' };
     render();
   }
 });
@@ -294,3 +328,4 @@ setInterval(() => {
 
 window.addEventListener('hashchange', () => { pendingRoute = null; render(); });
 render();
+loadStatus().then(render);

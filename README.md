@@ -18,11 +18,17 @@
 ## 실행
 
 ```bash
-npm start          # http://localhost:8000
-npm test           # 규칙 단위 테스트
+cp .env.example .env   # AI 연결 설정 (선택)
+npm start              # http://localhost:8000
+npm test
 ```
 
-빌드가 필요 없는 순수 HTML/JS예요. 데이터는 브라우저 localStorage에만 저장돼요.
+빌드도 의존성도 없어요 (Node 18+). 기록은 브라우저 localStorage에만 저장돼요.
+
+### AI 연결 (선택): 구독 로그인 사용
+
+API 키 대신 **OpenClaw**, **Hermes Agent**, **Claude Code**에 로그인된 ChatGPT·Claude 구독으로 동작해요. 설정 방법은 [docs/ai-setup.md](docs/ai-setup.md)에 있어요.
+AI는 입구의 연결 판단과 집중 공간의 “AI로 줄이기”에만 쓰고, 연결이 없으면 규칙만으로 동작해요.
 
 ## 구조
 
@@ -31,6 +37,9 @@ index.html, styles.css
 js/rules.js   연결 규칙·에너지 제안·공간별 공유 범위 (직접 고치는 곳)
 js/store.js   기억 저장소 (profile / 날짜별 상태 / 공간별 기록)
 js/app.js     화면
+js/ai.js      로컬 서버의 AI 호출 (실패 시 null → 규칙으로)
+server.js     로컬 서버: 정적 파일 + /api/ai 중계 (127.0.0.1 전용)
+server/       AI 연결 방식(providers)과 프롬프트(prompts)
 docs/architecture.md  설계와 다음 단계
 ```
 
