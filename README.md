@@ -44,3 +44,7 @@ docs/architecture.md  설계와 다음 단계
 ```
 
 연결 키워드는 `js/rules.js`의 `ROUTES`에서 내 분류에 맞게 고치면 돼요.
+
+## 설치 없이 쓰기 (claude.ai 링크 버전)
+
+`web/claude-artifact.html`은 claude.ai 아티팩트로 올린 한 장짜리 버전이에요. 링크만 열면 되고, 기록은 내 claude.ai 계정에 저장돼요. AI 기능은 내 Claude 계정으로 동작해요 (처음 쓸 때 한 번 허락을 물어요). 로컬 서버 버전과 기능은 같아요.
