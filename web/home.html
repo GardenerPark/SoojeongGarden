@@ -85,6 +85,8 @@ a { color: var(--primary); }
 const SERVER = 'Notion';
 const PROJ = 'collection://a40e6c1f-9b70-4617-8305-572ea56beae5';   // 프로젝트 DB
 const DAYS = 'collection://70cd5edd-5ac8-42b7-b9da-0b729f1c4ddd';   // Daily Journal
+const PROJ_VIEW = 'view://1f810591-0ee8-48b6-a2cd-0267b7d79048';   // 프로젝트 DB 기본 보기
+const DAYS_VIEW = 'view://3da6a8f3-8e38-81be-9758-000cfa9877ea';   // Daily Journal · Daily 보기 (최신순)
 const AREAS = ['AI 시스템', '영어', '명상', '에너지 관리', '유튜브', '학습', '관리'];  // 프로젝트 DB의 영역 선택지 순서
 const STATUS = ['진행 중', '대기', '완료'];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -227,18 +229,28 @@ async function saveStaged() {
 }
 
 // ===== 노션 읽기 =====
+let retried = {};
+function onErr(key, err, st) {
+  st.textContent = failCopy(err) + ' ';
+  const b = document.createElement('button'); b.textContent = '다시 불러오기'; b.className = 'ghost'; b.onclick = () => { retried = {}; watch(); }; st.appendChild(b);
+  if (err?.retryable && !retried[key]) { retried[key] = true; setTimeout(watch, Math.min(err.retryAfterMs || 2500, 10000) + Math.random() * 800); }
+}
+const rowsOf = (payload) => { const p = typeof payload === 'string' ? JSON.parse(payload) : payload; return p?.results || []; };
 function watch() {
   if (unsubP) unsubP(); if (unsubD) unsubD();
   const st = document.getElementById('state');
-  unsubP = mcp.watchTool(SERVER, 'notion-query-data-sources', { data: { mode: 'sql', data_source_urls: [PROJ], query: 'SELECT url, "이름" AS name, "영역" AS area, "상태" AS status, "현재 단계" AS stage, "다음 행동" AS next, "date:마감:start" AS due FROM [' + PROJ + '] ORDER BY "date:마감:start"' } }, (ev) => {
-    if (ev.type === 'data') { const p = ev.result.payload; const list = (typeof p === 'string' ? JSON.parse(p) : p)?.results || []; projects = list.map((x) => ({ url: x.url, name: x.name || '', area: x.area || '기타', status: x.status || '대기', stage: x.stage || '', next: x.next || '', due: x.due || '' })); st.textContent = ''; renderAreas(); renderChat(); }
-    else st.textContent = failCopy(ev.error);
+  unsubP = mcp.watchTool(SERVER, 'notion-query-data-sources', { data: { mode: 'view', view_url: PROJ_VIEW, page_size: 100 } }, (ev) => {
+    if (ev.type === 'data') {
+      projects = rowsOf(ev.result.payload).map((x) => ({ url: x.url, name: x['이름'] || '', area: x['영역'] || '기타', status: x['상태'] || '대기', stage: x['현재 단계'] || '', next: x['다음 행동'] || '', due: x['date:마감:start'] || '' }))
+        .sort((a, b) => (a.due || '9') < (b.due || '9') ? -1 : 1);
+      st.textContent = ''; renderAreas(); renderChat();
+    } else onErr('p', ev.error, st);
   }, { cache: { staleTime: 30000 }, refetchInterval: 120000 });
   const from = iso(new Date(Date.now() - 6 * 86400000));
-  unsubD = mcp.watchTool(SERVER, 'notion-query-data-sources', { data: { mode: 'sql', data_source_urls: [DAYS], query: 'SELECT url, "date:Date:start" AS d, "아침 에너지" AS am_e, "저녁 에너지" AS pm_e, "아침 명상" AS am_med, "저녁 명상" AS pm_med, "저널링" AS journal FROM [' + DAYS + '] WHERE Type = ? AND d >= ? AND d <= ?', params: ['Daily', from, today] } }, (ev) => {
+  unsubD = mcp.watchTool(SERVER, 'notion-query-data-sources', { data: { mode: 'view', view_url: DAYS_VIEW, page_size: 14 } }, (ev) => {
     if (ev.type !== 'data') return;
-    const p = ev.result.payload; const list = (typeof p === 'string' ? JSON.parse(p) : p)?.results || [];
-    days = {}; for (const x of list) days[x.d] = { url: x.url, am_e: x.am_e ?? null, pm_e: x.pm_e ?? null, am_med: x.am_med === '__YES__', pm_med: x.pm_med === '__YES__', journal: x.journal === '__YES__' };
+    days = {};
+    for (const x of rowsOf(ev.result.payload)) { const d = x['date:Date:start']; if (!d || d < from || d > today) continue; days[d] = { url: x.url, am_e: x['아침 에너지'] ?? null, pm_e: x['저녁 에너지'] ?? null, am_med: x['아침 명상'] === '__YES__', pm_med: x['저녁 명상'] === '__YES__', journal: x['저널링'] === '__YES__' }; }
     renderAreas(); renderChat();
     if (days[today]?.url) mcp.callTool(SERVER, 'notion-fetch', { id: days[today].url }, { cache: { staleTime: 60000 } }).then((res) => {
       const text = typeof res.payload === 'string' ? res.payload : res.payload?.text || '';
