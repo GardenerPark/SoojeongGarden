@@ -253,7 +253,7 @@ function failCopy(e) {
   if (c === 'server_not_connected' || c === 'selection_required') return 'claude.ai 설정 → 커넥터에서 Notion을 추가하면 보여요.';
   if (c === 'not_in_manifest' || c === 'blocked_by_policy' || c === 'approval_required') return '이 페이지에 Notion 사용이 허용되지 않았어요.';
   if (c === 'tool_error') return 'Notion이 응답했지만 데이터를 읽지 못했어요: ' + (e.message || '').slice(0, 120);
-  return '잠시 후 다시 열어 주세요. (' + (c || '연결 실패') + ')';
+  return '잠시 후 다시 열어 주세요. (' + (c || e?.message || '연결 실패') + ')';
 }
 function watchWeek() {
   if (unsub) { unsub(); unsub = null; }
