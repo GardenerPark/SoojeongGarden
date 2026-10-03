@@ -114,6 +114,7 @@ button[disabled] { opacity: .5; cursor: default; }
 // ===== 노션 Daily Journal (collection id는 노션에서 확인한 값) =====
 const DS = 'collection://70cd5edd-5ac8-42b7-b9da-0b729f1c4ddd';
 const SERVER = 'Notion';
+const DAYS_VIEW = 'view://3da6a8f3-8e38-81be-9758-000cfa9877ea';   // Daily 보기, 최신순
 const ROUTINES = [['아침 명상', 'am_med'], ['저녁 명상', 'pm_med'], ['저널링', 'journal']];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pad = (n) => String(n).padStart(2, '0');
@@ -233,18 +234,12 @@ async function loadBody(url) {
 }
 
 // ===== 노션에서 주간 데이터 읽기 =====
-function query(from, to) {
-  return {
-    mode: 'sql',
-    data_source_urls: [DS],
-    query: 'SELECT url, "date:Date:start" AS d, "아침 에너지" AS am_e, "저녁 에너지" AS pm_e, "아침 명상" AS am_med, "저녁 명상" AS pm_med, "저널링" AS journal FROM [' + DS + '] WHERE Type = ? AND d >= ? AND d <= ? ORDER BY d',
-    params: ['Daily', from, to],
-  };
-}
 function ingest(payload) {
-  const list = typeof payload === 'string' ? JSON.parse(payload).results : payload?.results;
-  for (const x of list || []) {
-    rows[x.d] = { url: x.url, am_e: x.am_e ?? null, pm_e: x.pm_e ?? null, am_med: x.am_med === '__YES__', pm_med: x.pm_med === '__YES__', journal: x.journal === '__YES__' }; rows[x.d].med = rows[x.d].am_med || rows[x.d].pm_med;
+  const p = typeof payload === 'string' ? JSON.parse(payload) : payload;
+  for (const x of p?.results || []) {
+    const d = x['date:Date:start']; if (!d) continue;
+    rows[d] = { url: x.url, am_e: x['아침 에너지'] ?? null, pm_e: x['저녁 에너지'] ?? null, am_med: x['아침 명상'] === '__YES__', pm_med: x['저녁 명상'] === '__YES__', journal: x['저널링'] === '__YES__' };
+    rows[d].med = rows[d].am_med || rows[d].pm_med;
   }
 }
 function failCopy(e) {
@@ -255,12 +250,12 @@ function failCopy(e) {
   if (c === 'tool_error') return 'Notion이 응답했지만 데이터를 읽지 못했어요: ' + (e.message || '').slice(0, 120);
   return '잠시 후 다시 열어 주세요. (' + (c || e?.message || '연결 실패') + ')';
 }
+let retried = false;
 function watchWeek() {
   if (unsub) { unsub(); unsub = null; }
-  const from = iso(weekStart), to = iso(addDays(weekStart, 6));
   const stale = document.getElementById('stale');
   stale.textContent = '노션에서 불러오는 중…';
-  unsub = mcp.watchTool(SERVER, 'notion-query-data-sources', { data: query(from, to) }, (ev) => {
+  unsub = mcp.watchTool(SERVER, 'notion-query-data-sources', { data: { mode: 'view', view_url: DAYS_VIEW, page_size: 60 } }, (ev) => {
     if (ev.type === 'data') {
       try { ingest(ev.result.payload); } catch { stale.textContent = '읽어온 모양이 달라요. 노션 DB 속성 이름을 확인해 주세요.'; return; }
       lastStored = ev.result.cache?.storedAt ?? null;
@@ -269,7 +264,9 @@ function watchWeek() {
     } else {
       const c = ev.error.code;
       if (['needs_reauth', 'server_not_connected', 'not_in_manifest', 'blocked_by_policy', 'approval_required'].includes(c)) { rows = {}; renderWeek(); renderDay(); }
-      stale.textContent = failCopy(ev.error);
+      stale.textContent = failCopy(ev.error) + ' ';
+      const b = document.createElement('button'); b.textContent = '다시 불러오기'; b.className = 'ghost'; b.onclick = () => { retried = false; watchWeek(); }; stale.appendChild(b);
+      if (ev.error.retryable && !retried) { retried = true; setTimeout(watchWeek, Math.min(ev.error.retryAfterMs || 2500, 10000)); }
     }
   }, { cache: { staleTime: 30000 }, refetchInterval: 120000 });
 }
@@ -336,8 +333,8 @@ document.getElementById('day').addEventListener('click', (e) => { if (e.target.i
 
 // ===== 시작 =====
 document.getElementById('week').addEventListener('click', (e) => { const b = e.target.closest('.cell'); if (!b || b.disabled) return; selected = b.dataset.date; renderWeek(); renderDay(); });
-document.getElementById('prev').addEventListener('click', () => { weekStart = addDays(weekStart, -7); if (mcp) watchWeek(); renderWeek(); });
-document.getElementById('next').addEventListener('click', () => { weekStart = addDays(weekStart, 7); if (mcp) watchWeek(); renderWeek(); });
+document.getElementById('prev').addEventListener('click', () => { weekStart = addDays(weekStart, -7); renderWeek(); renderDay(); });
+document.getElementById('next').addEventListener('click', () => { weekStart = addDays(weekStart, 7); renderWeek(); renderDay(); });
 renderWeek(); renderDay();
 (async () => {
   const use = window.claude?.use;
