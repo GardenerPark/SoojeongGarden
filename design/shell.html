@@ -1,0 +1,348 @@
+<title>Garden Shell</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 한 열, 하단 탭 셋. 오늘은 읽는 화면, 방 안에서만 대화, 집중 중엔 길이 없다. */
+:root {
+  --bg: #f7f9f9; --card: #ffffff; --fg: #203b3a; --muted: #607473; --line: #e0e8e5;
+  --primary: #206b60; --on-primary: #ffffff; --soft: #e6efec; --soft-fg: #165247;
+  --warn: #b63e3e; --ink: #203b3a; --paper: #f7f9f9;
+  --display: "Gowun Batang", "Apple SD Gothic Neo", serif;
+  --body: "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141a19; --card: #1c2423; --fg: #e6ecea; --muted: #98a8a5; --line: #2c3836;
+    --primary: #7cc3b0; --on-primary: #0f1f1b; --soft: #233531; --soft-fg: #a9d9cb; --ink: #e6ecea; --paper: #141a19;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141a19; --card: #1c2423; --fg: #e6ecea; --muted: #98a8a5; --line: #2c3836;
+  --primary: #7cc3b0; --on-primary: #0f1f1b; --soft: #233531; --soft-fg: #a9d9cb; --ink: #e6ecea; --paper: #141a19;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 var(--body); }
+main { max-width: 560px; margin: 0 auto; padding: 20px 16px 110px; }
+h1 { font: 700 1.6rem/1.3 var(--display); margin: 4px 0 2px; text-wrap: balance; }
+h2 { font-size: .85rem; letter-spacing: .04em; color: var(--muted); margin: 22px 0 8px; font-weight: 500; }
+.eyebrow { font-size: .8rem; color: var(--muted); letter-spacing: .06em; }
+.sub { color: var(--muted); margin: 0 0 6px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin: 8px 0; }
+.muted { color: var(--muted); } .small { font-size: .85rem; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.between { justify-content: space-between; }
+button { font: inherit; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--fg); cursor: pointer; }
+button.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); font-weight: 600; }
+button.ghost { border-color: transparent; background: transparent; color: var(--muted); padding: 4px 8px; }
+button.big { width: 100%; padding: 14px; font-size: 1.05rem; margin-top: 10px; }
+button:focus-visible, a:focus-visible, input:focus-visible, label:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+input, textarea { width: 100%; font: inherit; color: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+label.field { display: block; margin: 10px 0; } label.field > span { display: block; font-size: .9rem; margin-bottom: 4px; }
+
+/* 10점 척도 */
+.scale { display: flex; gap: 4px; margin: 6px 0; }
+.scale button { flex: 1; min-width: 0; padding: 8px 0; font-variant-numeric: tabular-nums; }
+.scale button.on { background: var(--soft); border-color: var(--primary); color: var(--soft-fg); font-weight: 700; }
+.scale.small button { padding: 6px 0; font-size: .85rem; }
+
+/* 루틴 체크 */
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); cursor: pointer; }
+.chip.on { background: var(--soft); border-color: var(--primary); color: var(--soft-fg); }
+.chip.on::before { content: "✓ "; }
+
+/* 일정·목록 */
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { display: flex; gap: 10px; align-items: baseline; padding: 7px 0; border-top: 1px solid var(--line); }
+.list li:first-child { border-top: 0; }
+.time { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 3.2em; }
+.list li .ghost { margin-left: auto; }
+
+/* 프로젝트 카드 */
+.proj { display: grid; gap: 4px; }
+.proj .area { font-size: .75rem; color: var(--primary); letter-spacing: .04em; }
+.proj .name { font-weight: 600; }
+.proj .next { color: var(--muted); }
+.proj .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+.due { font-size: .8rem; color: var(--muted); }
+
+/* 안내자: 비서가 먼저 말을 건다 */
+.guide { background: var(--primary); color: var(--on-primary); border: 0; }
+.guide .eyebrow { color: var(--on-primary); opacity: .75; }
+.guide .say { font: 700 1.25rem/1.4 var(--display); margin: 2px 0 6px; text-wrap: balance; }
+.guide .msg.me { background: rgba(255,255,255,.18); color: var(--on-primary); }
+.guide .msg.ai { background: rgba(255,255,255,.1); border-color: transparent; color: var(--on-primary); }
+.guide input { background: rgba(255,255,255,.14); border-color: transparent; color: var(--on-primary); }
+.guide input::placeholder { color: var(--on-primary); opacity: .7; }
+.guide button.primary { background: var(--on-primary); color: var(--primary); border-color: var(--on-primary); }
+.guide .row > button:not(.primary) { background: transparent; color: var(--on-primary); border-color: rgba(255,255,255,.4); }
+
+/* 대화 */
+.chat { display: grid; gap: 8px; margin: 10px 0; }
+.msg { max-width: 88%; padding: 9px 12px; border-radius: 14px; line-height: 1.5; }
+.msg.me { justify-self: end; background: var(--soft); color: var(--soft-fg); border-bottom-right-radius: 4px; }
+.msg.ai { justify-self: start; background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.preview { border: 1px dashed var(--primary); background: var(--soft); color: var(--soft-fg); border-radius: 12px; padding: 10px 12px; margin: 4px 0; }
+.preview .t { font-size: .75rem; letter-spacing: .04em; margin-bottom: 4px; }
+.composer { display: flex; gap: 8px; margin-top: 10px; } .composer input { flex: 1; }
+
+/* 집중 */
+.focus-run { text-align: center; padding-top: 10vh; }
+.focus-run .step { font: 700 1.6rem/1.3 var(--display); margin: 6px 0 18px; }
+.timer { font-size: 4.2rem; font-weight: 300; font-variant-numeric: tabular-nums; margin: 10px 0 26px; line-height: 1; }
+.timer.over { color: var(--primary); }
+.capture { display: flex; gap: 8px; position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: min(528px, calc(100% - 32px)); }
+.capture input { flex: 1; }
+
+/* 하단 탭 */
+nav { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 8px 16px calc(8px + env(safe-area-inset-bottom, 0px)); }
+nav .in { max-width: 560px; margin: 0 auto; display: flex; }
+nav a { flex: 1; text-align: center; text-decoration: none; color: var(--muted); padding: 6px; border-radius: 10px; font-size: .9rem; }
+nav a.on { color: var(--primary); font-weight: 700; background: var(--soft); }
+body.focusing nav { display: none; }
+
+#toast { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 9px 14px; border-radius: 10px; font-size: .9rem; max-width: calc(100% - 32px); z-index: 5; }
+.note { font-size: .78rem; color: var(--muted); text-align: center; margin: 26px 0 0; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main id="app"></main>
+<nav><div class="in">
+  <a href="#today" data-view="today">오늘</a>
+  <a href="#english" data-view="english">영어</a>
+  <a href="#focus" data-view="focus">집중</a>
+</div></nav>
+<div id="toast" role="status" hidden></div>
+
+<script>
+// ====== 가짜 데이터: 노션에서 본 실제 모양 그대로. 저장은 아무 데도 안 됨. ======
+const D = {
+  date: '10월 3일 금요일',
+  energy: { am: null, pm: null },        // 1~10. Daily Journal 아침/저녁 에너지
+  routines: [                            // Daily Journal 체크박스 5개
+    { k: 'am_med', label: '아침 명상', on: true }, { k: 'z2', label: 'Zone 2', on: false },
+    { k: 'plan', label: '계획', on: false }, { k: 'pm_med', label: '저녁 명상', on: false }, { k: 'journal', label: '저널링', on: false },
+  ],
+  events: [{ t: '11:00', title: '영어모임' }, { t: '15:00', title: '피부과 상담' }],   // 캘린더
+  projects: [                            // 노션 프로젝트 DB · 상태=진행 중
+    { area: '유튜브', name: '하와이 에세이 브이로그 완성', next: '참고 에세이 브이로그 1개 분석 → 핵심 메시지 한 문장 + 장면 3개', due: '10/10' },
+    { area: '명상', name: '10/10 명상가이드 준비', next: '10/10에 쓸 가이드 1개 골라 쉼 구간까지 설계하고 소리 내어 연습', due: '10/10' },
+    { area: 'AI 시스템', name: 'Gate — 통합 홈·에이전트 작업 공간', next: 'Gate 홈 첫 화면 만들기', due: '' },
+  ],
+  parked: [{ id: 1, text: '여행 숙소 알아보기' }, { id: 2, text: '청자켓 코디' }],   // 맡겨둔 일
+  english: {
+    today: '배운 표현 3개 남기고 내 문장 만들기',
+    recent: [{ d: '10/01', t: 'I feel tempted to…' }, { d: '09/15', t: 'Catch up · Hope we can · Mondays' }, { d: '09/13', t: 'The Wedding People · 진심과 거절' }],
+    chat: [{ who: 'ai', text: '어제 "I feel tempted to…"를 남기셨죠. 오늘은 그 표현으로 내 상황 문장 하나 만들어 볼까요?' }],
+  },
+  guide: [],       // 오늘의 안내자 대화 (오늘 계획만)
+  session: null,   // 집중 진행 중
+  focusStage: null,
+  prefill: null,
+};
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $app = document.getElementById('app');
+function toast(m) { const el = document.getElementById('toast'); el.textContent = m; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, 2600); }
+const isPM = () => new Date().getHours() >= 16;
+
+// ====== 오늘: 읽는 화면. 입력은 에너지·루틴 체크뿐. ======
+function viewToday() {
+  const slot = isPM() ? 'pm' : 'am';
+  const e = D.energy[slot];
+  return `
+    <p class="eyebrow">${esc(D.date)}</p>
+    <h1>수정님, 오늘은 어떤가요?</h1>
+
+    ${guideCard(slot, e)}
+
+    <h2>${slot === 'am' ? '아침' : '저녁'} 에너지 ${e ? `<b>${e}</b>/10` : ''}</h2>
+    <div class="scale" data-act="energy" data-slot="${slot}">
+      ${[1,2,3,4,5,6,7,8,9,10].map((n) => `<button class="${n === e ? 'on' : ''}" data-n="${n}">${n}</button>`).join('')}
+    </div>
+    ${D.energy.am && slot === 'pm' ? `<p class="small muted">아침 ${D.energy.am}/10</p>` : ''}
+
+    <h2>오늘 일정</h2>
+    <div class="card"><ul class="list">${D.events.map((x) => `<li><span class="time">${esc(x.t)}</span>${esc(x.title)}</li>`).join('')}</ul></div>
+
+    <h2>루틴</h2>
+    <div class="chips">${D.routines.map((r) => `<button class="chip ${r.on ? 'on' : ''}" data-act="routine" data-k="${r.k}">${esc(r.label)}</button>`).join('')}</div>
+
+    <h2>진행 중 <span class="muted">${D.projects.length}</span></h2>
+    ${D.projects.map((p, i) => `
+      <div class="card proj">
+        <span class="area">${esc(p.area)}</span>
+        <span class="name">${esc(p.name)}</span>
+        <span class="next">다음: ${esc(p.next)}</span>
+        <div class="foot"><span class="due">${p.due ? `마감 ${esc(p.due)}` : ''}</span><button data-act="continue" data-i="${i}">이어서 작업</button></div>
+      </div>`).join('')}
+
+    <h2>맡겨둔 일 <span class="muted">${D.parked.length}</span></h2>
+    <div class="card">${D.parked.length ? `<ul class="list">${D.parked.map((p) => `<li>${esc(p.text)}<button class="ghost" data-act="done-parked" data-id="${p.id}">처리함</button></li>`).join('')}</ul>` : '<p class="muted" style="margin:0">비어 있어요.</p>'}</div>
+    <p class="note">껍데기예요. 아무것도 저장되지 않아요.</p>`;
+}
+
+// 안내자는 상태를 보고 먼저 말한다. 할 수 있는 건 오늘 계획뿐. 다른 얘기는 방으로 안내.
+function guideLine(slot, e) {
+  const top = D.projects[0];
+  if (e == null) return slot === 'am' ? '좋은 아침이에요. 지금 에너지는 어느 정도예요? 위 숫자를 눌러주시면 오늘을 같이 잡아볼게요.' : '저녁이에요. 오늘 에너지는 어땠어요?';
+  if (e <= 4) return `에너지 ${e}, 낮은 날이네요. 그래도 ${top.name.split(' ')[0]}을 10분만 열어볼까요? "${top.next.slice(0, 22)}…"까지만요.`;
+  if (D.routines.some((r) => r.k === 'plan' && !r.on)) return `에너지 ${e}, 괜찮네요. 오늘 11시 영어모임 전에 ${top.name.split(' ')[0]} 한 블록 어때요? 계획 세우기 체크는 아직이에요.`;
+  return `오늘 계획은 섰어요. 가장 중요한 건 ${top.name.split(' ')[0]}. 시작할 때 "이어서 작업"을 눌러요.`;
+}
+function guideCard(slot, e) {
+  return `
+    <div class="card guide">
+      <p class="eyebrow">오늘의 안내자</p>
+      <div class="say">${esc(guideLine(slot, e))}</div>
+      <div class="chat">${D.guide.map((m) => m.who === 'suggest'
+        ? `<div class="msg ai">${esc(m.text)}<div class="row" style="margin-top:6px"><button class="primary" data-act="go-room" data-room="${m.room}">${esc(m.label)}로 이동</button><button data-act="drop-guide">여기 있을게요</button></div></div>`
+        : `<div class="msg ${m.who}">${esc(m.text)}</div>`).join('')}</div>
+      <form class="composer" data-form="guide"><input name="text" placeholder="오늘 어떻게 할지 같이 정하기" autocomplete="off" required /><button class="primary">보내기</button></form>
+    </div>`;
+}
+
+// ====== 영어 방: 기록 + 이 방의 코치. 대화는 여기서만. ======
+function viewEnglish() {
+  const E = D.english;
+  return `
+    <p class="eyebrow">방</p>
+    <h1>영어</h1>
+    <h2>오늘 할 것</h2>
+    <div class="card">${esc(E.today)}</div>
+    <h2>최근 기록</h2>
+    <div class="card"><ul class="list">${E.recent.map((r) => `<li><span class="time">${esc(r.d)}</span>${esc(r.t)}</li>`).join('')}</ul></div>
+
+    <h2>영어 코치 <span class="muted small">· 영어 기록과 오늘 에너지 숫자만 알아요</span></h2>
+    <div class="chat">
+      ${E.chat.map((m) => m.who === 'preview'
+        ? `<div class="preview"><div class="t">영어공부 페이지에 이렇게 저장할게요</div>${esc(m.text)}<div class="row" style="margin-top:8px"><button class="primary" data-act="save-preview">저장</button><button data-act="drop-preview">취소</button></div></div>`
+        : m.who === 'park'
+        ? `<div class="preview"><div class="t">영어 밖의 일이에요</div>“${esc(m.text)}” 맡겨둔 일에 넣어둘까요?<div class="row" style="margin-top:8px"><button class="primary" data-act="park-yes" data-text="${esc(m.text)}">넣기</button><button data-act="drop-preview">무시</button></div></div>`
+        : `<div class="msg ${m.who}">${esc(m.text)}</div>`).join('')}
+    </div>
+    <form class="composer" data-form="chat"><input name="text" placeholder="코치에게 말하기" autocomplete="off" required /><button class="primary">보내기</button></form>
+    <p class="note">시험: "저장해줘"라고 보내면 미리보기, "숙소"라고 보내면 맡겨두기 제안이 떠요.</p>`;
+}
+
+// ====== 집중: 시작 전 → 진행 중(탭 사라짐) → 끝낸 뒤 ======
+const mmss = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
+const remaining = (s) => s.startedAt + s.minutes * 60000 - Date.now();
+function viewFocus() {
+  const s = D.session;
+  if (s && D.focusStage !== 'review') return `
+    <section class="focus-run">
+      <p class="eyebrow">${esc(s.task)}</p>
+      <div class="step">${esc(s.step)}</div>
+      <div class="timer" id="timer">${mmss(remaining(s))}</div>
+      <button class="primary" data-act="end">끝내기</button>
+      <form class="capture" data-form="capture"><input name="text" placeholder="떠오른 생각은 여기 맡겨두기" autocomplete="off" required /><button>맡겨두기</button></form>
+    </section>`;
+  if (s && D.focusStage === 'review') return `
+    <p class="eyebrow">집중 끝</p>
+    <h1>${esc(s.step)}</h1>
+    <form data-form="review" class="card">
+      <h2 style="margin-top:4px">첫 행동, 해냈나요?</h2>
+      <div class="row" data-pick="done"><button type="button" class="chip" data-v="1">해냈어요</button><button type="button" class="chip" data-v="0">아직</button></div>
+      <h2>지금 에너지</h2>
+      <div class="scale small" data-pick="energy">${[1,2,3,4,5,6,7,8,9,10].map((n) => `<button type="button" data-v="${n}">${n}</button>`).join('')}</div>
+      <label class="field"><span>한 줄</span><input name="note" placeholder="예: 시작하니 생각보다 괜찮았음" autocomplete="off" /></label>
+      <label class="field"><span>프로젝트의 다음 행동을 바꿀까요? <span class="muted">(건너뛰어도 돼요)</span></span><input name="next" placeholder="${esc(s.step)}" autocomplete="off" /></label>
+      <button class="primary big">저장</button>
+    </form>`;
+  const e = D.energy[isPM() ? 'pm' : 'am'] ?? D.energy.am;
+  const min = e == null ? 15 : e <= 4 ? 10 : e <= 7 ? 15 : 25;
+  const p = D.prefill || {};
+  const picked = p.task ? D.projects.findIndex((x) => x.name === p.task) : -1;
+  return `
+    <p class="eyebrow">모드</p>
+    <h1>무엇에 마음을 모을까요?</h1>
+    <h2>진행 중인 일 <span class="muted">· 하나 고르면 다음 행동이 채워져요</span></h2>
+    ${D.projects.map((x, i) => `
+      <button type="button" class="card proj" style="width:100%;text-align:left;display:grid;${i === picked ? 'border-color:var(--primary);background:var(--soft)' : ''}" data-act="pick-project" data-i="${i}">
+        <span class="area">${esc(x.area)}${x.due ? ` · 마감 ${esc(x.due)}` : ''}</span>
+        <span class="name">${esc(x.name)}</span>
+        <span class="next small">다음: ${esc(x.next)}</span>
+      </button>`).join('')}
+    <button type="button" class="ghost" data-act="pick-project" data-i="-1" style="margin:2px 0 6px">${picked === -1 && p.other ? '✓ ' : ''}다른 일로 할래요</button>
+
+    <form data-form="start" class="card">
+      <label class="field"><span>중요한 일</span><input name="task" required autocomplete="off" value="${esc(p.task || '')}" placeholder="위에서 고르거나 직접 적기" /></label>
+      <label class="field"><span>첫 행동 <span class="muted small">${e == null ? '· 에너지를 적으면 시간을 맞춰줘요' : `· 에너지 ${e}/10이라 ${min}분으로 제안해요`}</span></span><input name="step" required autocomplete="off" value="${esc(p.step || '')}" placeholder="${picked >= 0 ? '' : '예: 참고 영상 1개 분석'}" /></label>
+      ${e != null && e <= 4 && p.step ? `<p class="small muted" style="margin:0 0 6px">에너지가 낮으니 "${esc(p.step)}"를 10분 안에 끝낼 크기로 더 줄여도 돼요.</p>` : ''}
+      <h2>시간</h2>
+      <div class="row" data-pick="minutes">${[10, 15, 25].map((m) => `<button type="button" class="chip ${m === min ? 'on' : ''}" data-v="${m}">${m}분</button>`).join('')}</div>
+      <button class="primary big">시작</button>
+    </form>`;
+}
+
+// ====== 렌더 ======
+function view() { const h = location.hash.replace('#', '') || 'today'; return ['today', 'english', 'focus'].includes(h) ? h : 'today'; }
+function render() {
+  const v = view();
+  document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('on', a.dataset.view === v));
+  document.body.classList.toggle('focusing', v === 'focus' && !!D.session && D.focusStage !== 'review');
+  $app.innerHTML = { today: viewToday, english: viewEnglish, focus: viewFocus }[v]();
+  window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', render);
+
+// ====== 동작 (전부 메모리 안에서만) ======
+$app.addEventListener('click', (e) => {
+  const pick = e.target.closest('[data-pick] > button');
+  if (pick) { const g = pick.parentElement; g.querySelectorAll('button').forEach((b) => b.classList.remove('on')); pick.classList.add('on'); g.dataset.value = pick.dataset.v; return; }
+  const b = e.target.closest('[data-act], [data-n]');
+  if (!b) return;
+  const act = b.dataset.act || b.parentElement.dataset.act;
+  switch (act) {
+    case 'energy': D.energy[b.parentElement.dataset.slot] = Number(b.dataset.n); toast('Daily Journal에 기록돼요 (껍데기)'); return render();
+    case 'routine': { const r = D.routines.find((x) => x.k === b.dataset.k); r.on = !r.on; toast(`${r.label} ${r.on ? '체크' : '해제'}`); return render(); }
+    case 'continue': { const p = D.projects[b.dataset.i]; D.prefill = { task: p.name, step: p.next }; location.hash = 'focus'; return; }
+    case 'done-parked': D.parked = D.parked.filter((p) => p.id !== Number(b.dataset.id)); return render();
+    case 'end': D.focusStage = 'review'; return render();
+    case 'pick-project': { const i = Number(b.dataset.i); D.prefill = i >= 0 ? { task: D.projects[i].name, step: D.projects[i].next } : { other: true }; return render(); }
+    case 'go-room': D.guide = []; location.hash = b.dataset.room; return;
+    case 'drop-guide': D.guide = D.guide.filter((m) => m.who !== 'suggest'); return render();
+    case 'save-preview': D.english.chat = D.english.chat.filter((m) => m.who !== 'preview'); D.english.recent.unshift({ d: '10/03', t: 'I feel tempted to… · 내 문장' }); D.english.chat.push({ who: 'ai', text: '영어공부 페이지에 저장했어요.' }); toast('노션 영어공부에 저장 (껍데기)'); return render();
+    case 'drop-preview': D.english.chat = D.english.chat.filter((m) => m.who !== 'preview' && m.who !== 'park'); return render();
+    case 'park-yes': D.parked.push({ id: Date.now(), text: b.dataset.text }); D.english.chat = D.english.chat.filter((m) => m.who !== 'park'); D.english.chat.push({ who: 'ai', text: '맡겨둔 일에 넣어뒀어요. 영어로 돌아올까요?' }); toast('맡겨둔 일에 추가'); return render();
+  }
+});
+$app.addEventListener('submit', (e) => {
+  e.preventDefault(); const f = e.target; const fd = new FormData(f);
+  switch (f.dataset.form) {
+    case 'start': {
+      const minutes = Number(f.querySelector('[data-pick=minutes]').dataset.value || f.querySelector('[data-pick=minutes] .on')?.dataset.v || 15);
+      D.session = { task: fd.get('task').trim(), step: fd.get('step').trim(), minutes, startedAt: Date.now() };
+      D.focusStage = null; D.prefill = null; return render();
+    }
+    case 'capture': D.parked.push({ id: Date.now(), text: fd.get('text').trim() }); f.reset(); return toast('맡겨뒀어요. 하던 일을 이어가세요.');
+    case 'review': {
+      const next = fd.get('next').trim();
+      if (next) { const p = D.projects.find((x) => x.name === D.session.task); if (p) p.next = next; }
+      D.session = null; D.focusStage = null; toast('Daily Journal에 집중 기록 + 프로젝트 갱신 (껍데기)'); location.hash = 'today'; return render();
+    }
+    case 'guide': {
+      const text = fd.get('text').trim(); f.reset();
+      D.guide.push({ who: 'me', text });
+      if (/영어|표현|복습/.test(text)) D.guide.push({ who: 'suggest', text: '그건 영어 방에서 하는 게 좋겠어요. 영어 기록은 거기 있어요.', room: 'english', label: '영어 방' });
+      else if (/피곤|힘들|졸려/.test(text)) D.guide.push({ who: 'ai', text: '그럼 오늘은 하나만 해요. 하와이 영상, 10분. 끝나면 쉬어도 돼요. 아래 "이어서 작업"을 눌러요.' });
+      else D.guide.push({ who: 'ai', text: '좋아요. 그럼 오전엔 하와이 영상, 11시 영어모임, 오후엔 명상가이드 손보기. 이렇게 갈까요?' });
+      return render();
+    }
+    case 'chat': {
+      const text = fd.get('text').trim(); f.reset();
+      D.english.chat.push({ who: 'me', text });
+      if (/저장/.test(text)) D.english.chat.push({ who: 'preview', text: '2026-10-03 | I feel tempted to…\n· I feel tempted to skip the meeting, but I’ll go.\n· 내 상황: 피곤한 날에도 영어모임 가기' });
+      else if (/숙소|쇼핑|예약|사야/.test(text)) D.english.chat.push({ who: 'park', text });
+      else D.english.chat.push({ who: 'ai', text: '좋아요. 그 문장을 영어로 한 번 적어보세요. 고쳐드릴게요.' });
+      render(); window.scrollTo(0, document.body.scrollHeight); return;
+    }
+  }
+});
+setInterval(() => { const el = document.getElementById('timer'); if (!el || !D.session) return; const r = remaining(D.session); el.textContent = mmss(r); if (r <= 0) el.classList.add('over'); }, 1000);
+render();
+</script>
