@@ -1,0 +1,250 @@
+<title>Garden Days</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 노션 Daily Journal 위에 얹는 창문. 쓰는 곳이 아니라 보는 곳. 한 열, 주 단위 띠 → 날짜 → 그날 적은 것. */
+:root {
+  --bg: #f7f9f9; --card: #ffffff; --fg: #203b3a; --muted: #607473; --line: #e0e8e5;
+  --primary: #206b60; --on-primary: #ffffff; --soft: #e6efec; --soft-fg: #165247;
+  --warn: #b63e3e; --ink: #203b3a; --paper: #f7f9f9;
+  --e1: #f1e9d8; --e2: #cfe3d9; --e3: #8fc2b0; --e4: #3f8f78; --e5: #206b60;
+  --display: "Gowun Batang", "Apple SD Gothic Neo", serif;
+  --body: "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141a19; --card: #1c2423; --fg: #e6ecea; --muted: #98a8a5; --line: #2c3836;
+    --primary: #7cc3b0; --on-primary: #0f1f1b; --soft: #233531; --soft-fg: #a9d9cb; --ink: #e6ecea; --paper: #141a19;
+    --e1: #2a2d26; --e2: #22463c; --e3: #2f6b5a; --e4: #4a9a82; --e5: #7cc3b0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141a19; --card: #1c2423; --fg: #e6ecea; --muted: #98a8a5; --line: #2c3836;
+  --primary: #7cc3b0; --on-primary: #0f1f1b; --soft: #233531; --soft-fg: #a9d9cb; --ink: #e6ecea; --paper: #141a19;
+  --e1: #2a2d26; --e2: #22463c; --e3: #2f6b5a; --e4: #4a9a82; --e5: #7cc3b0;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 var(--body); }
+main { max-width: 640px; margin: 0 auto; padding: 20px 16px 48px; }
+h1 { font: 700 1.6rem/1.3 var(--display); margin: 2px 0 4px; text-wrap: balance; }
+h2 { font-size: .85rem; letter-spacing: .04em; color: var(--muted); margin: 22px 0 8px; font-weight: 500; }
+.eyebrow { font-size: .8rem; color: var(--muted); letter-spacing: .06em; }
+.muted { color: var(--muted); } .small { font-size: .85rem; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin: 8px 0; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.between { justify-content: space-between; }
+button { font: inherit; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--fg); cursor: pointer; }
+button.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* 주간 띠: 요일이 열, 지표가 행 */
+.week { display: grid; grid-template-columns: 4.2em repeat(7, 1fr); gap: 4px 3px; align-items: center; }
+.week .lab { font-size: .78rem; color: var(--muted); }
+.week .dow { text-align: center; font-size: .78rem; color: var(--muted); }
+.week .dow.today { color: var(--primary); font-weight: 700; }
+.cell { height: 34px; border-radius: 8px; display: grid; place-items: center; font-size: .82rem; font-variant-numeric: tabular-nums; background: var(--card); border: 1px solid var(--line); cursor: pointer; }
+.cell.sel { outline: 2px solid var(--primary); outline-offset: -2px; }
+.cell.empty { color: var(--muted); background: transparent; border-style: dashed; }
+.cell.e-1 { background: var(--e1); } .cell.e-2 { background: var(--e2); } .cell.e-3 { background: var(--e3); color: var(--on-primary); } .cell.e-4 { background: var(--e4); color: var(--on-primary); } .cell.e-5 { background: var(--e5); color: var(--on-primary); }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--primary); }
+.dot.off { background: transparent; border: 1px solid var(--line); }
+.cell .n { font-weight: 700; }
+
+/* 그날 */
+.day h1 { margin-top: 2px; }
+.kv { display: grid; grid-template-columns: 5em 1fr; gap: 6px 10px; margin: 6px 0; }
+.kv .k { color: var(--muted); font-size: .9rem; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); font-size: .85rem; color: var(--muted); }
+.chip.on { background: var(--soft); border-color: var(--primary); color: var(--soft-fg); }
+.chip.on::before { content: "✓ "; }
+.body { white-space: pre-wrap; line-height: 1.7; }
+.body h3 { font-size: 1rem; margin: 14px 0 4px; }
+.body blockquote { margin: 6px 0; padding-left: 12px; border-left: 3px solid var(--line); color: var(--muted); }
+.body ul { margin: 4px 0; padding-left: 18px; }
+.body details { margin: 8px 0; } .body summary { cursor: pointer; color: var(--primary); }
+a { color: var(--primary); }
+
+/* 상태 */
+.state { text-align: center; padding: 28px 12px; color: var(--muted); }
+.state b { color: var(--fg); display: block; margin-bottom: 4px; }
+.stale { font-size: .78rem; color: var(--muted); }
+.legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: .78rem; color: var(--muted); margin-top: 10px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 3px; }
+@media (max-width: 420px) { .week { grid-template-columns: 3.4em repeat(7, 1fr); } .cell { height: 30px; font-size: .76rem; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main>
+  <p class="eyebrow">Garden · 하루</p>
+  <h1>날들이 어떻게 흘러가고 있나</h1>
+  <p class="muted small">노션 Daily Journal을 그대로 읽어요. 적는 건 지금처럼 AI에게 말하면 돼요.</p>
+
+  <div class="row between" style="margin-top:14px">
+    <button id="prev" aria-label="이전 주">‹ 지난주</button>
+    <span id="range" class="small muted"></span>
+    <button id="next" aria-label="다음 주">다음주 ›</button>
+  </div>
+  <div class="card" id="weekCard">
+    <div class="week" id="week"></div>
+    <div class="legend"><span><i style="background:var(--e1)"></i>낮음</span><span><i style="background:var(--e3)"></i>보통</span><span><i style="background:var(--e5)"></i>높음</span><span><span class="dot" style="display:inline-block;vertical-align:-1px"></span> 했음</span></div>
+    <p class="stale" id="stale"></p>
+  </div>
+
+  <section id="day"></section>
+</main>
+
+<script>
+// ===== 노션 Daily Journal (collection id는 노션에서 확인한 값) =====
+const DS = 'collection://70cd5edd-5ac8-42b7-b9da-0b729f1c4ddd';
+const SERVER = 'Notion';
+const ROUTINES = [['아침 명상', 'am_med'], ['Zone 2', 'z2'], ['계획 세우기', 'plan'], ['저녁 명상', 'pm_med'], ['저널링', 'journal']];
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pad = (n) => String(n).padStart(2, '0');
+const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const KDOW = ['일', '월', '화', '수', '목', '금', '토'];
+const today = iso(new Date());
+
+// 상태
+let mcp = null;
+let weekStart = startOfWeek(new Date());
+let rows = {};          // date -> row
+let selected = today;
+let lastStored = null;
+let unsub = null;
+
+function startOfWeek(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; } // 월요일 시작
+function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+const level = (e) => e == null ? 0 : e <= 3 ? 1 : e <= 5 ? 2 : e <= 7 ? 3 : e <= 8.5 ? 4 : 5;
+
+// ===== 주간 띠 =====
+function renderWeek() {
+  const days = [...Array(7)].map((_, i) => addDays(weekStart, i));
+  document.getElementById('range').textContent = `${days[0].getMonth() + 1}월 ${days[0].getDate()}일 – ${days[6].getMonth() + 1}월 ${days[6].getDate()}일`;
+  const head = `<span></span>${days.map((d) => `<span class="dow ${iso(d) === today ? 'today' : ''}">${KDOW[d.getDay()]}<br>${d.getDate()}</span>`).join('')}`;
+  const line = (label, cellFn) => `<span class="lab">${label}</span>${days.map((d) => cellFn(iso(d), rows[iso(d)])).join('')}`;
+  const cell = (date, inner, cls = '') => `<button class="cell ${cls} ${date === selected ? 'sel' : ''}" data-date="${date}" ${date > today ? 'disabled' : ''}>${inner}</button>`;
+  const energy = (date, r, k) => { const e = r?.[k]; return cell(date, e == null ? '·' : `<span class="n">${e}</span>`, e == null ? 'empty' : `e-${level(e)}`); };
+  const did = (date, r, k) => cell(date, r ? `<span class="dot ${r[k] ? '' : 'off'}"></span>` : '·', r ? '' : 'empty');
+  document.getElementById('week').innerHTML = head
+    + line('아침', (d, r) => energy(d, r, 'am_e'))
+    + line('저녁', (d, r) => energy(d, r, 'pm_e'))
+    + line('명상', (d, r) => did(d, r, 'am_med'))
+    + line('운동', (d, r) => did(d, r, 'z2'))
+    + line('계획', (d, r) => did(d, r, 'plan'))
+    + line('저널', (d, r) => did(d, r, 'journal'));
+}
+
+// ===== 그날 =====
+function renderDay() {
+  const r = rows[selected];
+  const d = new Date(selected + 'T00:00:00');
+  const title = `${d.getMonth() + 1}월 ${d.getDate()}일 ${KDOW[d.getDay()]}요일`;
+  const el = document.getElementById('day');
+  if (!r) { el.innerHTML = `<div class="card day"><h1>${title}</h1><p class="muted" style="margin:0">이날은 Daily Journal에 기록이 없어요.</p></div>`; return; }
+  el.innerHTML = `
+    <div class="card day">
+      <p class="eyebrow">그날</p>
+      <h1>${title}</h1>
+      <div class="kv">
+        <span class="k">에너지</span><span>${r.am_e ?? '–'} <span class="muted">아침</span> &nbsp;→&nbsp; ${r.pm_e ?? '–'} <span class="muted">저녁</span></span>
+        <span class="k">루틴</span><span class="chips">${ROUTINES.map(([lab, k]) => `<span class="chip ${r[k] ? 'on' : ''}">${lab}</span>`).join('')}</span>
+      </div>
+      <div id="body" class="body"><p class="muted small">적은 것을 불러오는 중…</p></div>
+      ${r.url ? `<p class="small" style="margin:10px 0 0"><a href="${esc(r.url)}" target="_blank" rel="noopener">노션에서 열기 ↗</a></p>` : ''}
+    </div>`;
+  if (r.url) loadBody(r.url);
+}
+
+// 노션 페이지 본문을 아주 단순하게 보여준다. 태그는 걷어내고 제목·인용·목록만 살린다.
+function toHtml(text) {
+  const start = text.indexOf('<content>'), end = text.indexOf('</content>');
+  let t = start >= 0 ? text.slice(start + 9, end >= 0 ? end : undefined) : text;
+  t = t.replace(/<mention-page[^>]*\/>/g, '(연결된 페이지)').replace(/<empty-block\/>/g, '').replace(/<[^>]+>/g, '');
+  const out = []; let inList = false;
+  for (const raw of t.split('\n')) {
+    const line = raw.replace(/\\\|/g, '|').trim();
+    if (!line) { if (inList) { out.push('</ul>'); inList = false; } continue; }
+    const li = line.match(/^- \[( |x)\] (.*)/) || line.match(/^[-*] (.*)/);
+    if (li) { if (!inList) { out.push('<ul>'); inList = true; } const done = li[1] === 'x'; const body = li[2] ?? li[1]; out.push(`<li>${li.length === 3 ? (done ? '✓ ' : '○ ') : ''}${inline(body)}</li>`); continue; }
+    if (inList) { out.push('</ul>'); inList = false; }
+    const h = line.match(/^(#{1,3}) (.*)/);
+    if (h) { out.push(`<h3>${inline(h[2])}</h3>`); continue; }
+    if (line.startsWith('>')) { out.push(`<blockquote>${inline(line.replace(/^>\s?/, '').replace(/<br>/g, '\n'))}</blockquote>`); continue; }
+    out.push(`<p style="margin:4px 0">${inline(line)}</p>`);
+  }
+  if (inList) out.push('</ul>');
+  return out.join('\n');
+}
+function inline(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\[(.+?)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>'); }
+
+async function loadBody(url) {
+  const el = document.getElementById('body');
+  if (!mcp) { el.innerHTML = '<p class="muted small">노션 연결이 없어 본문은 못 보여드려요.</p>'; return; }
+  try {
+    const res = await mcp.callTool(SERVER, 'notion-fetch', { id: url }, { cache: { staleTime: 60000 } });
+    const p = res.payload;
+    const text = typeof p === 'string' ? p : p?.text || '';
+    el.innerHTML = text ? toHtml(text) : '<p class="muted small">본문이 비어 있어요.</p>';
+  } catch (e) {
+    el.innerHTML = `<p class="muted small">${failCopy(e)}</p>`;
+  }
+}
+
+// ===== 노션에서 주간 데이터 읽기 =====
+function query(from, to) {
+  return {
+    mode: 'sql',
+    data_source_urls: [DS],
+    query: 'SELECT url, "date:Date:start" AS d, "아침 에너지" AS am_e, "저녁 에너지" AS pm_e, "아침 명상" AS am_med, "Zone 2" AS z2, "계획 세우기" AS plan, "저녁 명상" AS pm_med, "저널링" AS journal FROM [' + DS + '] WHERE Type = ? AND d >= ? AND d <= ? ORDER BY d',
+    params: ['Daily', from, to],
+  };
+}
+function ingest(payload) {
+  const list = typeof payload === 'string' ? JSON.parse(payload).results : payload?.results;
+  for (const x of list || []) {
+    rows[x.d] = { url: x.url, am_e: x.am_e ?? null, pm_e: x.pm_e ?? null, am_med: x.am_med === '__YES__', z2: x.z2 === '__YES__', plan: x.plan === '__YES__', pm_med: x.pm_med === '__YES__', journal: x.journal === '__YES__' };
+  }
+}
+function failCopy(e) {
+  const c = e?.code;
+  if (c === 'needs_reauth') return 'Notion 연결이 만료됐어요. claude.ai 설정 → 커넥터에서 Notion을 다시 연결해 주세요.';
+  if (c === 'server_not_connected' || c === 'selection_required') return 'claude.ai 설정 → 커넥터에서 Notion을 추가하면 보여요.';
+  if (c === 'not_in_manifest' || c === 'blocked_by_policy' || c === 'approval_required') return '이 페이지에 Notion 사용이 허용되지 않았어요.';
+  if (c === 'tool_error') return 'Notion이 응답했지만 데이터를 읽지 못했어요: ' + (e.message || '').slice(0, 120);
+  return '잠시 후 다시 열어 주세요. (' + (c || '연결 실패') + ')';
+}
+function watchWeek() {
+  if (unsub) { unsub(); unsub = null; }
+  const from = iso(weekStart), to = iso(addDays(weekStart, 6));
+  const stale = document.getElementById('stale');
+  stale.textContent = '노션에서 불러오는 중…';
+  unsub = mcp.watchTool(SERVER, 'notion-query-data-sources', { data: query(from, to) }, (ev) => {
+    if (ev.type === 'data') {
+      try { ingest(ev.result.payload); } catch { stale.textContent = '읽어온 모양이 달라요. 노션 DB 속성 이름을 확인해 주세요.'; return; }
+      lastStored = ev.result.cache?.storedAt ?? null;
+      stale.textContent = lastStored ? `마지막 갱신 ${new Date(lastStored).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}` : '';
+      renderWeek(); renderDay();
+    } else {
+      const c = ev.error.code;
+      if (['needs_reauth', 'server_not_connected', 'not_in_manifest', 'blocked_by_policy', 'approval_required'].includes(c)) { rows = {}; renderWeek(); renderDay(); }
+      stale.textContent = failCopy(ev.error);
+    }
+  }, { cache: { staleTime: 30000 }, refetchInterval: 120000 });
+}
+
+// ===== 시작 =====
+document.getElementById('week').addEventListener('click', (e) => { const b = e.target.closest('.cell'); if (!b || b.disabled) return; selected = b.dataset.date; renderWeek(); renderDay(); });
+document.getElementById('prev').addEventListener('click', () => { weekStart = addDays(weekStart, -7); if (mcp) watchWeek(); renderWeek(); });
+document.getElementById('next').addEventListener('click', () => { weekStart = addDays(weekStart, 7); if (mcp) watchWeek(); renderWeek(); });
+renderWeek(); renderDay();
+(async () => {
+  const use = window.claude?.use;
+  mcp = use ? await use('mcp') : null;
+  if (!mcp) { document.getElementById('stale').textContent = 'claude.ai 안에서 열면 노션 기록이 보여요.'; return; }
+  watchWeek();
+})();
+</script>
