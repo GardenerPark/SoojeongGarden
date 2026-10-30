@@ -143,7 +143,7 @@ struct TransitionView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("다음 하나는?").font(.title.bold())
             CandidateChips(candidates: DayEngine.nextCandidates(day)) { declaration = $0.text }
-            DeclareField(text: $declaration) {
+            DeclareField(text: $declaration, fieldID: "nextDeclareField") {
                 model.startDeclared(declaration)
                 model.reviewingBlock = nil
             }

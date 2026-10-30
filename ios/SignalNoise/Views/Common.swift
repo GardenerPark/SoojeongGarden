@@ -93,6 +93,7 @@ struct DeclareField: View {
     @Binding var text: String
     @StateObject private var speech = SpeechInput()
     var placeholder = "예: 기획서 초안 2시간"
+    var fieldID = "declareField"
     let onStart: () -> Void
 
     private var preview: DeclarationParser.Result { DeclarationParser.parse(text) }
@@ -101,7 +102,7 @@ struct DeclareField: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 TextField(placeholder, text: $text)
-                    .accessibilityIdentifier("declareField")
+                    .accessibilityIdentifier(fieldID)
                     .font(.title3)
                     .submitLabel(.go)
                     .onSubmit { if !preview.title.isEmpty { onStart() } }

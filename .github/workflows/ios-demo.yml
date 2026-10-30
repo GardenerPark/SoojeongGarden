@@ -7,6 +7,9 @@ on:
   push:
     paths: ["ios/**", ".github/workflows/ios-demo.yml"]
 
+permissions:
+  contents: write
+
 jobs:
   demo:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[demo]')
@@ -65,8 +68,35 @@ jobs:
           brew install ffmpeg >/dev/null 2>&1 || true
           ffmpeg -y -loglevel error -i out/raw.mov -vf "scale=-2:1280" -c:v libx264 -pix_fmt yuv420p -movflags +faststart out/demo.mp4 || cp out/raw.mov out/demo.mov
           rm -f out/raw.mov
+          # UI 테스트가 찍은 스크린샷(첨부)을 결과 번들에서 꺼낸다
+          xcrun xcresulttool export attachments --path out/DayLoop.xcresult --output-path out/attachments || true
+          python3 - <<'PY'
+          import json, os, shutil
+          src = "out/attachments"
+          manifest = os.path.join(src, "manifest.json")
+          if os.path.exists(manifest):
+              for test in json.load(open(manifest)):
+                  for a in test.get("attachments", []):
+                      name = a.get("suggestedHumanReadableName", a["exportedFileName"]).split("_")[0]
+                      shutil.copy(os.path.join(src, a["exportedFileName"]), f"out/screenshots/{name}.png")
+          PY
           ls -la out out/screenshots
-          exit $STATUS
+          echo "STATUS=$STATUS" >> "$GITHUB_ENV"
+
+      - name: 결과를 ios-demo-output 브랜치에 올리기
+        if: always()
+        run: |
+          mkdir -p /tmp/demo-out && cd /tmp/demo-out
+          cp "$GITHUB_WORKSPACE"/ios/out/demo.* . 2>/dev/null || true
+          cp -R "$GITHUB_WORKSPACE"/ios/out/screenshots . 2>/dev/null || true
+          printf 'commit: %s\ntest exit: %s\n' "${{ github.sha }}" "${STATUS:-?}" > RESULT.txt
+          git init -q -b ios-demo-output
+          git add -A
+          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit -qm "iOS demo for ${{ github.sha }}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ios-demo-output
+
+      - name: 테스트 결과
+        run: exit "${STATUS:-1}"
 
       - uses: actions/upload-artifact@v4
         if: always()

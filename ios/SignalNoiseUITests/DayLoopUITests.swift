@@ -69,7 +69,7 @@ final class DayLoopUITests: XCTestCase {
         tap(app.buttons["triage-보관"])
 
         // ⑦ 다음 하나: "지금"으로 고른 생각으로 시작
-        let next = field("declareField")
+        let next = field("nextDeclareField")
         tap(next)
         next.typeText("경쟁사 비교 표 넣기 30분\n")
         XCTAssertTrue(app.buttons["끝냈어요"].waitForExistence(timeout: 5))
