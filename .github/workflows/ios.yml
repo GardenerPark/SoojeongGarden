@@ -2,6 +2,7 @@ name: iOS
 
 on:
   push:
+    branches: [claude/energy-management-service-bcsxj9]
     paths: ["ios/**", ".github/workflows/ios.yml"]
   pull_request:
     paths: ["ios/**", ".github/workflows/ios.yml"]
