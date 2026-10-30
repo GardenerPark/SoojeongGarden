@@ -41,7 +41,7 @@ struct DayCloseView: View {
                 }
                 .buttonStyle(.ink)
                 .padding()
-                .background(.bar)
+                .background(Color(uiColor: .systemBackground))
             }
         }
     }

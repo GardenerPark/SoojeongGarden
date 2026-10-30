@@ -174,9 +174,10 @@ struct InkButtonStyle: ButtonStyle {
                 .font(.body.weight(.semibold))
                 .padding(.horizontal, 18)
                 .padding(.vertical, 12)
-                .foregroundStyle(filled ? Color(.systemBackground) : Color.primary)
-                .background(filled ? Color.primary : Color.clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary, lineWidth: filled ? 0 : 1))
+                // 기본색(.primary)은 반투명 배경 위에서 흐려지므로 시스템 글자색을 직접 쓴다
+                .foregroundStyle(filled ? Color(uiColor: .systemBackground) : Color(uiColor: .label))
+                .background(filled ? Color(uiColor: .label) : Color.clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color(uiColor: .label), lineWidth: filled ? 0 : 1))
                 .opacity(isEnabled ? (configuration.isPressed ? 0.7 : 1) : 0.3)
         }
     }

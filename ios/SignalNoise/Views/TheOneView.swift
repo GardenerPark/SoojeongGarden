@@ -80,7 +80,7 @@ struct TheOneView: View {
                 .buttonStyle(.ink)
                 .disabled(theOne.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .padding()
-                .background(.bar)
+                .background(Color(uiColor: .systemBackground))
             }
         }
     }

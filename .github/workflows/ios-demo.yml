@@ -44,6 +44,8 @@ jobs:
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl ui "$UDID" appearance light
+          # 처음 키보드를 쓸 때 뜨는 "밀어서 입력" 안내를 끈다
+          xcrun simctl spawn "$UDID" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true
           xcrun simctl status_bar "$UDID" override --time "9:41" --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3
 
       - name: 빌드
