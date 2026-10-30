@@ -40,6 +40,8 @@ targets:
       path: SignalNoise/Info.plist
       properties:
         CFBundleDisplayName: 하나
+        # 표준 HTTPS 외 암호화 없음 → 업로드할 때마다 수출 규정 질문을 건너뛴다
+        ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
