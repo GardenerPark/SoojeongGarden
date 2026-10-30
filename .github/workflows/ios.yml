@@ -1,0 +1,47 @@
+name: iOS
+
+on:
+  push:
+    paths: ["ios/**", ".github/workflows/ios.yml"]
+  pull_request:
+    paths: ["ios/**", ".github/workflows/ios.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode 선택 (가장 최신)
+        run: |
+          latest=$(ls -d /Applications/Xcode_*.app | grep -v beta | sort -V | tail -1)
+          sudo xcode-select -s "$latest"
+          xcodebuild -version
+
+      - name: 핵심 로직 테스트
+        run: swift test --package-path Packages/SignalNoiseCore
+
+      - name: 프로젝트 생성
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: 앱 + 위젯 빌드 (시뮬레이터, 서명 없음)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project SignalNoise.xcodeproj \
+            -scheme SignalNoise \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO | tee build.log | grep -E "error:|warning: .*(deprecated|will be an error)|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build.log
