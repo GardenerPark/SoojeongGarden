@@ -83,12 +83,27 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.soojeong.signalnoise.widget
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
 
+  SignalNoiseUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - SignalNoiseUITests
+    dependencies:
+      - target: SignalNoise
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.soojeong.signalnoise.uitests
+        GENERATE_INFOPLIST_FILE: YES
+
 schemes:
   SignalNoise:
     build:
       targets:
         SignalNoise: all
+        SignalNoiseUITests: [test]
     run:
       config: Debug
     test:
       config: Debug
+      targets:
+        - SignalNoiseUITests

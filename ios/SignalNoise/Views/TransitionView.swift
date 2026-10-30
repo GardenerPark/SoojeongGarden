@@ -51,6 +51,7 @@ struct TransitionView: View {
             }
 
             TextField("지금 상태 한 줄 (선택)", text: $note, axis: .vertical)
+                .accessibilityIdentifier("noteField")
                 .padding(14)
                 .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
@@ -155,6 +156,7 @@ struct TransitionView: View {
                     // 회고 시트가 내려간 뒤에 마무리 시트를 연다
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { model.showDayClose = true }
                 }
+                .accessibilityIdentifier("transitionDayClose")
             }
             .font(.subheadline)
         }
@@ -180,6 +182,7 @@ struct TransitionView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
         }
+        .accessibilityIdentifier("triage-\(title)")
         if prominent {
             button.buttonStyle(.ink)
         } else {

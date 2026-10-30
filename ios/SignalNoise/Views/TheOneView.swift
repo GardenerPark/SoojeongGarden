@@ -22,6 +22,7 @@ struct TheOneView: View {
             Form {
                 Section {
                     TextField("오늘 이것 하나만 끝내면 되는 일", text: $theOne, axis: .vertical)
+                        .accessibilityIdentifier("theOneField")
                         .font(.title3.weight(.semibold))
                 } header: {
                     Text("오늘의 하나")
@@ -31,7 +32,7 @@ struct TheOneView: View {
 
                 Section("썸 · 선택") {
                     ForEach(thumbs.indices, id: \.self) { i in
-                        TextField(i == 0 ? "썸 하나" : "썸 둘", text: $thumbs[i])
+                        TextField(i == 0 ? "썸 하나" : "썸 둘", text: $thumbs[i]).accessibilityIdentifier("thumb\(i)")
                     }
                 }
 

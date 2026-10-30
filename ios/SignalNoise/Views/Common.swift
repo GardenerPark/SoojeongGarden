@@ -101,6 +101,7 @@ struct DeclareField: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 TextField(placeholder, text: $text)
+                    .accessibilityIdentifier("declareField")
                     .font(.title3)
                     .submitLabel(.go)
                     .onSubmit { if !preview.title.isEmpty { onStart() } }

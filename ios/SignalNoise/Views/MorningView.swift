@@ -17,6 +17,7 @@ struct MorningView: View {
                 .font(.title2.bold())
 
             TextEditor(text: $text)
+                .accessibilityIdentifier("morningEditor")
                 .focused($focused)
                 .font(.body)
                 .scrollContentBackground(.hidden)
