@@ -1,0 +1,92 @@
+# XcodeGen 설정. Mac에서: brew install xcodegen && xcodegen generate
+name: SignalNoise
+options:
+  bundleIdPrefix: com.soojeong
+  developmentLanguage: ko
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    # Xcode에서 Signing & Capabilities의 Team을 고르거나, 여기에 팀 ID를 적는다
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+
+packages:
+  SignalNoiseCore:
+    path: Packages/SignalNoiseCore
+
+targets:
+  SignalNoise:
+    type: application
+    platform: iOS
+    sources:
+      - SignalNoise
+      - Shared
+    dependencies:
+      - package: SignalNoiseCore
+      - target: SignalNoiseWidget
+    entitlements:
+      path: SignalNoise/SignalNoise.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.soojeong.signalnoise
+    info:
+      path: SignalNoise/Info.plist
+      properties:
+        CFBundleDisplayName: 하나
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSMicrophoneUsageDescription: 말로 쏟아내고, 말로 다음 하나를 시작하기 위해 마이크를 써요.
+        NSSpeechRecognitionUsageDescription: 말한 내용을 글로 바꾸기 위해 음성 인식을 써요. 가능하면 기기 안에서만 처리해요.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.soojeong.signalnoise
+            CFBundleURLSchemes:
+              - signalnoise
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.soojeong.signalnoise
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+
+  SignalNoiseWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - SignalNoiseWidget
+      - Shared
+    dependencies:
+      - package: SignalNoiseCore
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    entitlements:
+      path: SignalNoiseWidget/SignalNoiseWidget.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.soojeong.signalnoise
+    info:
+      path: SignalNoiseWidget/Info.plist
+      properties:
+        CFBundleDisplayName: 하나 위젯
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.soojeong.signalnoise.widget
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+
+schemes:
+  SignalNoise:
+    build:
+      targets:
+        SignalNoise: all
+    run:
+      config: Debug
+    test:
+      config: Debug
