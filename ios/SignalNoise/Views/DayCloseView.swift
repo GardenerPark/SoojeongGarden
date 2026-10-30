@@ -39,7 +39,7 @@ struct DayCloseView: View {
                 } label: {
                     Text("오늘 하루 닫기").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 6)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.ink)
                 .padding()
                 .background(.bar)
             }
@@ -58,7 +58,7 @@ struct DaySummary: View {
                 Text("\(day.doneCount)개").font(.system(size: 48, weight: .bold, design: .rounded))
                 if let one = day.theOne {
                     Label(one, systemImage: day.theOneDone ? "checkmark.seal.fill" : "scope")
-                        .foregroundStyle(day.theOneDone ? Color.green : Color.secondary)
+                        .foregroundStyle(day.theOneDone ? Color.primary : Color.secondary)
                 }
             }
 
@@ -75,7 +75,7 @@ struct DaySummary: View {
                         HStack(alignment: .top, spacing: 12) {
                             VStack(spacing: 0) {
                                 Circle()
-                                    .fill(block.isTheOne ? Color.accentColor : Color.secondary.opacity(0.5))
+                                    .fill(block.isTheOne ? Color.primary : Color.secondary.opacity(0.5))
                                     .frame(width: 10, height: 10)
                                     .padding(.top, 5)
                                 if index < day.finishedBlocks.count - 1 {

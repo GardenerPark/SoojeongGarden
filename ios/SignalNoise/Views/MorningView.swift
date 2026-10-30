@@ -45,7 +45,7 @@ struct MorningView: View {
                 } label: {
                     Text("오늘의 하나 정하기").padding(.horizontal, 6)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.ink)
             }
         }
         .padding(20)

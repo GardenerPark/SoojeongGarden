@@ -37,7 +37,7 @@ struct TheOneBar: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: day.theOneDone ? "checkmark.seal.fill" : "scope")
-                .foregroundStyle(day.theOneDone ? Color.green : Color.accentColor)
+                .foregroundStyle(.primary)
             VStack(alignment: .leading, spacing: 2) {
                 Text("오늘의 하나").font(.caption).foregroundStyle(.secondary)
                 Text(day.theOne ?? "")
@@ -48,7 +48,7 @@ struct TheOneBar: View {
             Spacer(minLength: 0)
         }
         .padding(14)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.primary.opacity(0.15)))
         .accessibilityElement(children: .combine)
     }
 }
@@ -70,7 +70,8 @@ struct CandidateChips: View {
                             .lineLimit(1)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .background(Color.accentColor.opacity(c.kind == .theOne ? 0.18 : 0.08), in: Capsule())
+                            .background(Color.primary.opacity(0.06), in: Capsule())
+                            .overlay(Capsule().strokeBorder(Color.primary, lineWidth: c.kind == .theOne ? 1 : 0))
                     }
                     .buttonStyle(.plain)
                 }
@@ -117,7 +118,7 @@ struct DeclareField: View {
                 }
                 Spacer()
                 Button("시작", action: onStart)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.ink)
                     .disabled(preview.title.isEmpty)
             }
         }
@@ -151,6 +152,37 @@ extension View {
     func dictation(_ speech: SpeechInput, into text: Binding<String>, onFinish: ((String) -> Void)? = nil) -> some View {
         modifier(DictationModifier(speech: speech, text: text, onFinish: onFinish))
     }
+}
+
+/// 흑백 버튼: 채운 것(검정 바탕·흰 글씨, 다크 모드에선 반대)과 테두리만 있는 것
+struct InkButtonStyle: ButtonStyle {
+    var filled = true
+
+    func makeBody(configuration: Configuration) -> some View {
+        InkButton(configuration: configuration, filled: filled)
+    }
+
+    private struct InkButton: View {
+        let configuration: ButtonStyle.Configuration
+        let filled: Bool
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            configuration.label
+                .font(.body.weight(.semibold))
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .foregroundStyle(filled ? Color(.systemBackground) : Color.primary)
+                .background(filled ? Color.primary : Color.clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary, lineWidth: filled ? 0 : 1))
+                .opacity(isEnabled ? (configuration.isPressed ? 0.7 : 1) : 0.3)
+        }
+    }
+}
+
+extension ButtonStyle where Self == InkButtonStyle {
+    static var ink: InkButtonStyle { InkButtonStyle() }
+    static var inkOutline: InkButtonStyle { InkButtonStyle(filled: false) }
 }
 
 func haptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .light) {

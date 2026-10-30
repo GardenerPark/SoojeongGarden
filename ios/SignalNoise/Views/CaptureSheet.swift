@@ -12,7 +12,7 @@ struct CaptureSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
-                TextField("떠오른 생각", text: $text)
+                TextField("떠오른 생각을 남겨요", text: $text)
                     .font(.title3)
                     .focused($focused)
                     .submitLabel(.done)

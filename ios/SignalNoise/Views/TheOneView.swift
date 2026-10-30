@@ -76,7 +76,7 @@ struct TheOneView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.ink)
                 .disabled(theOne.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .padding()
                 .background(.bar)

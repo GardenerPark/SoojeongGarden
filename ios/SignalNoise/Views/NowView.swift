@@ -20,14 +20,14 @@ struct NowView: View {
                 startPanel(day)
             }
             Spacer()
+            HStack {
+                Spacer()
+                CaptureButton { model.showCapture = true }
+            }
+            .padding(.bottom, 12)
             TheOneBar(day: day)
-                .padding(.trailing, 76) // 쏟아내기 버튼 자리
         }
         .padding(20)
-        .overlay(alignment: .bottomTrailing) {
-            CaptureButton { model.showCapture = true }
-                .padding(20)
-        }
     }
 
     private func header(_ day: Day) -> some View {
@@ -39,7 +39,7 @@ struct NowView: View {
             if day.doneCount > 0 {
                 Label("\(day.doneCount)", systemImage: "checkmark.circle")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(.primary)
                     .accessibilityLabel("끝낸 하나 \(day.doneCount)개")
             }
             Button {
@@ -90,7 +90,8 @@ struct CurrentBlockCard: View {
                         let over = context.date.timeIntervalSince(block.startedAt) > Double(planned * 60)
                         Text(over ? "선언한 \(Format.minutes(planned))이 지났어요" : "선언한 시간 \(Format.minutes(planned))")
                             .font(.footnote)
-                            .foregroundStyle(over ? Color.orange : Color.secondary)
+                            .fontWeight(over ? .semibold : .regular)
+                            .foregroundStyle(over ? Color.primary : Color.secondary)
                     }
                 }
             }
@@ -101,8 +102,7 @@ struct CurrentBlockCard: View {
                     .frame(maxWidth: 220)
                     .padding(.vertical, 6)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .buttonStyle(.ink)
         }
         .frame(maxWidth: .infinity)
     }
@@ -113,13 +113,13 @@ struct CaptureButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "plus")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.white)
-                .frame(width: 60, height: 60)
-                .background(Color.accentColor, in: Circle())
-                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+            Label("생각 남기기", systemImage: "plus")
+                .font(.headline)
+                .foregroundStyle(Color(.systemBackground))
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
+                .background(Color.primary, in: Capsule())
         }
-        .accessibilityLabel("쏟아내기")
+        .accessibilityHint("떠오른 생각을 적어두고 지금 화면으로 돌아와요")
     }
 }

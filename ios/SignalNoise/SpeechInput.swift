@@ -95,7 +95,7 @@ struct MicButton: View {
             Image(systemName: speech.isRecording ? "waveform.circle.fill" : "mic.circle")
                 .font(.system(size: 30))
                 .symbolEffect(.pulse, isActive: speech.isRecording)
-                .foregroundStyle(speech.isRecording ? Color.accentColor : Color.secondary)
+                .foregroundStyle(speech.isRecording ? Color.primary : Color.secondary)
         }
         .accessibilityLabel(speech.isRecording ? "받아쓰기 멈추기" : "말로 하기")
     }

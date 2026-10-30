@@ -93,7 +93,7 @@ struct TransitionView: View {
                         Label(suggestion ? "오늘의 하나와 관련 있어 보여요" : "오늘의 하나와는 거리가 있어 보여요",
                               systemImage: suggestion ? "sparkles" : "moon.zzz")
                             .font(.footnote)
-                            .foregroundStyle(suggestion ? Color.accentColor : Color.secondary)
+                            .foregroundStyle(suggestion ? Color.primary : Color.secondary)
                     }
                     Text(Format.time.string(from: thought.createdAt))
                         .font(.caption)
@@ -166,7 +166,7 @@ struct TransitionView: View {
         Button(action: action) {
             Text(title).font(.headline).frame(maxWidth: .infinity).padding(.vertical, 6)
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.ink)
     }
 
     @ViewBuilder
@@ -181,9 +181,9 @@ struct TransitionView: View {
             .padding(.vertical, 8)
         }
         if prominent {
-            button.buttonStyle(.borderedProminent)
+            button.buttonStyle(.ink)
         } else {
-            button.buttonStyle(.bordered)
+            button.buttonStyle(.inkOutline)
         }
     }
 }

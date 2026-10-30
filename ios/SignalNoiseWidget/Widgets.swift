@@ -113,7 +113,7 @@ struct TheOneWidgetView: View {
             } else if snapshot.doneCount > 0 {
                 Label("끝낸 하나 \(snapshot.doneCount)", systemImage: "checkmark.circle")
                     .font(.caption)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(.primary)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
