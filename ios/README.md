@@ -67,6 +67,20 @@ open SignalNoise.xcodeproj
 cd ios/Packages/SignalNoiseCore && swift test
 ```
 
+## Mac 없이: GitHub Actions
+
+| 워크플로 | 하는 일 |
+|---|---|
+| `iOS` (`ios.yml`) | PR마다 핵심 로직 테스트와 앱·위젯 빌드 (Xcode 26.3) |
+| `iOS demo` (`ios-demo.yml`) | 시뮬레이터에서 하루 루프 UI 테스트를 녹화해요. 영상과 App Store 크기 스크린샷(1320×2868)이 `ios-demo-output` 브랜치에 올라가요. Actions 탭에서 직접 실행하거나, 커밋 메시지에 `[demo]`를 넣으면 돌아요 |
+| `TestFlight` (`testflight.yml`) | Actions 탭에서 직접 실행하면 아카이브하고 TestFlight에 업로드해요. 먼저 저장소 Secrets에 `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`을 넣어야 해요(파일 맨 위 설명 참고) |
+
+`TestFlight`는 직접 실행하는 워크플로라서, 기본 브랜치에 병합된 뒤에 Actions 탭에 나타나요.
+
+## App Store 제출 자료
+
+`AppStore/listing.md`에 이름, 부제, 설명, 키워드, 심사 메모, 개인정보 답변이 정리돼 있어요. `AppStore/privacy.md`는 개인정보 처리방침이에요. 문의 메일을 채운 뒤 공개 페이지(Notion 등)에 올리고, 그 주소를 App Store Connect에 넣어요.
+
 ## 구조
 
 ```
