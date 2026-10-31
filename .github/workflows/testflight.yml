@@ -11,9 +11,13 @@ name: TestFlight
 
 on:
   workflow_dispatch:
+  # 기본 브랜치에 병합하기 전에도 돌릴 수 있게: 커밋 메시지에 [testflight]를 넣어 푸시하면 실행된다
+  push:
+    paths: ["ios/**", ".github/workflows/testflight.yml"]
 
 jobs:
   upload:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[testflight]')
     runs-on: macos-15
     timeout-minutes: 45
     defaults:
