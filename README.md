@@ -15,6 +15,10 @@
 
 학습·생활 비서 공간은 아직 없어요. 그쪽으로 향하는 요청은 **보관**만 돼요.
 
+## Signal & Noise
+
+하루 집중 앱 **Signal & Noise**(오늘의 하나 → 블록 → 전환 회고)의 웹앱·서버·MCP는 [signal-noise/](signal-noise/README.md)에 있어요.
+
 ## 실행
 
 ```bash

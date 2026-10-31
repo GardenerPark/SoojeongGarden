@@ -1,0 +1,10 @@
+{
+  "name": "signal-noise",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "mcp": "node mcp-stdio.js",
+    "test": "node --test test/*.test.js"
+  }
+}
