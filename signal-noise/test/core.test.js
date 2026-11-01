@@ -109,3 +109,12 @@ test('그사이 다른 곳에서 저장했으면 다시 읽고 한 번 더 한�
   const texts = (await svc.run('view')).morning.map((t) => t.text);
   assert.deepEqual(texts, ['폰에서 던진 생각', 'Claude가 던진 생각']);
 });
+
+test('계속 겹치면 안내 문구로 실패하고, 약한 ETag는 강한 ETag로 바꾼다', async () => {
+  const { strongEtag } = await import('../store-blob.js');
+  assert.equal(strongEtag('W/"abc"'), '"abc"');
+  assert.equal(strongEtag('"abc"'), '"abc"');
+  const store = { load: memoryStore().load, save: async () => { throw new VersionConflict(); } };
+  const svc = createService({ store, clock: () => new Date('2026-10-31T00:00:00Z') });
+  await assert.rejects(() => svc.run('dump', { text: 'x' }), /한 번 더 눌러/);
+});

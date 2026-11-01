@@ -74,7 +74,9 @@ export function createService({ store, timeZone = 'Asia/Seoul', clock = () => ne
           await store.save(state, version);
           return result;
         } catch (e) {
-          if (!(e instanceof VersionConflict) || attempt >= 3) throw e;
+          if (!(e instanceof VersionConflict)) throw e;
+          if (attempt >= 3) throw new core.SNError('저장이 겹쳤어요. 한 번 더 눌러 주세요.');
+          await new Promise((r) => setTimeout(r, 150 * 2 ** attempt));
         }
       }
     },

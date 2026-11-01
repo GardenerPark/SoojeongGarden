@@ -78,7 +78,7 @@ function toast(msg) {
 
 const MIC = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
 const PLUS = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
-const mic = (target) => (SR ? `<button type="button" class="round outline" data-action="mic" data-target="${target}" aria-label="말로 적기">${MIC}</button>` : '');
+const mic = (target) => (SR ? `<button type="button" class="round outline" data-action="mic" data-target="${target}" aria-label="말로 적기" aria-pressed="false">${MIC}</button>` : '');
 
 const anchor = () => `<footer class="anchor"><span class="label">오늘의 하나</span><b>${esc(view.one)}</b></footer>`;
 
@@ -349,19 +349,46 @@ function fill(text) {
   render();
 }
 
+// 말하는 동안 인식된 글자를 입력창에 바로 넣는다. 다시 누르면 멈춘다.
+let rec = null;
+const setMic = (on) => document.querySelectorAll('[data-action="mic"]').forEach((b) => {
+  b.classList.toggle('on', on);
+  b.setAttribute('aria-pressed', String(on));
+  b.setAttribute('aria-label', on ? '듣기 멈추기' : '말로 적기');
+});
+
 function listen(target) {
-  const rec = new SR();
+  if (rec) return rec.stop();
+  const base = (fields[target] || '').trim();
+  rec = new SR();
   rec.lang = 'ko-KR';
-  rec.interimResults = false;
+  rec.interimResults = true;
+  rec.continuous = true;
   rec.onresult = (ev) => {
-    const said = ev.results[0][0].transcript;
-    fields[target] = [(fields[target] || '').trim(), said].filter(Boolean).join(' ');
+    let said = '';
+    for (const r of ev.results) said += r[0].transcript;
+    fields[target] = [base, said.trim()].filter(Boolean).join(' ');
     const el = document.getElementById(target);
     if (el) el.value = fields[target];
   };
-  rec.onerror = () => toast('음성을 듣지 못했어요. 키보드의 받아쓰기도 쓸 수 있어요.');
-  rec.start();
-  toast('듣고 있어요');
+  rec.onerror = (ev) => {
+    if (ev.error === 'no-speech' || ev.error === 'aborted') return;
+    toast(ev.error === 'not-allowed' || ev.error === 'service-not-allowed'
+      ? '마이크를 쓸 수 없어요. 설정 → Safari → 마이크에서 허용하거나, 키보드의 받아쓰기를 써 주세요.'
+      : '음성을 알아듣지 못했어요. 키보드의 받아쓰기도 쓸 수 있어요.');
+  };
+  rec.onend = () => {
+    rec = null;
+    setMic(false);
+    document.getElementById(target)?.focus();
+  };
+  try {
+    rec.start();
+    setMic(true);
+  } catch {
+    rec = null;
+    toast('음성 인식을 시작하지 못했어요. 키보드의 받아쓰기를 써 주세요.');
+  }
 }
 
 $app.addEventListener('click', (e) => {
@@ -409,7 +436,7 @@ $app.addEventListener('click', (e) => {
 document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && refresh());
 setInterval(() => {
   const typing = document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName);
-  if (document.visibilityState === 'visible' && !typing && !ui.capture) refresh();
+  if (document.visibilityState === 'visible' && !typing && !ui.capture && !rec) refresh();
 }, 30000);
 
 refresh();
