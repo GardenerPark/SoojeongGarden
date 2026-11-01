@@ -26,7 +26,7 @@ npm start            # http://localhost:8100
 npm test
 ```
 
-빌드도 의존성도 없어요 (Node 18+). 기록은 `data/store.json` 한 파일에 저장돼요(git에 올라가지 않음).
+로컬에서는 빌드 없이 돌아가요 (Node 18+, `npm install` 후). 기록은 `data/store.json` 한 파일에 저장돼요(git에 올라가지 않음).
 
 | 환경변수 | 기본값 | 뜻 |
 |---|---|---|
@@ -37,9 +37,18 @@ npm test
 
 `signal-noise/.env`에 적어 두어도 됩니다.
 
+### Vercel 배포
+
+`signal-noise/`를 루트로 하는 Vercel 프로젝트로 올라가 있어요 (`vercel.json`, `api/index.js`).
+
+- 웹앱은 `web/`에서 정적으로, `/api/*`와 `/mcp`는 함수 하나(`api/index.js`)가 받는다.
+- 기록은 Vercel Blob **비공개** 저장소의 JSON 한 개(`signal-noise/store.json`). 저장소를 프로젝트에 연결하면 `BLOB_READ_WRITE_TOKEN`이 자동으로 들어간다.
+- 프로젝트 환경변수: `SN_TOKEN`(필수, 없으면 API가 열리지 않음), `SN_TZ`.
+- 함수 리전은 저장소와 같은 서울(icn1).
+
 ### 아이폰에서 쓰기
 
-1. 서버를 휴대폰에서 닿는 곳에서 `SN_TOKEN`과 함께 연다 (집 Mac + Tailscale, 또는 Railway 같은 호스팅. 호스팅이면 `SN_DATA`를 영구 볼륨에).
+1. 서버를 휴대폰에서 닿는 곳에서 `SN_TOKEN`과 함께 연다 (위 Vercel 배포, 또는 집 Mac + Tailscale).
 2. Safari에서 `https://<주소>/?token=<토큰>`을 한 번 연다. 토큰은 그 기기에 저장되고 주소창에서 지워진다.
 3. 공유 → **홈 화면에 추가**.
 
@@ -93,10 +102,13 @@ Claude Desktop의 `claude_desktop_config.json`:
 
 ```
 core.js        하루 규칙 (오늘의 하나, 블록, 쏟아내기, 회고, 마무리, 선언 해석)
-service.js     저장소(JSON 파일) + 규칙을 묶은 ops. 웹앱과 MCP가 같이 쓴다
-server.js      웹앱 + REST(/api/<op>) + MCP(/mcp, Streamable HTTP의 JSON 응답)
+service.js     저장소 + 규칙을 묶은 ops. 웹앱과 MCP가 같이 쓴다
+server.js      로컬 서버: 웹앱 + REST(/api/<op>) + MCP(/mcp, Streamable HTTP의 JSON 응답)
 mcp.js         MCP 도구 정의와 JSON-RPC 처리
 mcp-stdio.js   로컬 MCP 클라이언트용 stdio 서버
+http.js        /api, /mcp 요청 처리 (로컬 서버와 Vercel 함수가 같이 씀)
+store-blob.js  Vercel Blob 저장소 (읽은 ETag가 그대로일 때만 덮어씀)
+api/index.js   Vercel 함수
 web/           흑백 모바일 웹앱 (홈 화면에 추가해서 사용)
 ```
 
