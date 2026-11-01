@@ -19,6 +19,10 @@
 
 하루 집중 앱 **Signal & Noise**(오늘의 하나 → 블록 → 전환 회고)의 웹앱·서버·MCP는 [signal-noise/](signal-noise/README.md)에 있어요.
 
+## 생각과 자료 (메모 앱)
+
+노션 "생각과 자료" DB를 아이폰 메모처럼 쓰고 태그별로 모아 읽는 웹앱은 [notes/](notes/README.md)에 있어요.
+
 ## 실행
 
 ```bash

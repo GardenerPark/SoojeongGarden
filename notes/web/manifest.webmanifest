@@ -1,0 +1,9 @@
+{
+  "name": "생각과 자료",
+  "short_name": "생각",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#faf8f3",
+  "theme_color": "#faf8f3",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
