@@ -1,0 +1,89 @@
+name: TestFlight
+
+# Actions 탭 → TestFlight → Run workflow 로 직접 실행한다.
+# 필요한 저장소 Secrets (Settings → Secrets and variables → Actions):
+#   APPLE_TEAM_ID         개발자 계정 Team ID (10자리)
+#   ASC_KEY_ID            App Store Connect API 키 ID
+#   ASC_ISSUER_ID         App Store Connect API Issuer ID
+#   ASC_KEY_P8            API 키 파일(.p8) 내용 전체
+# API 키는 App Store Connect → 사용자 및 액세스 → 통합 → App Store Connect API 에서
+# "관리자(Admin)" 역할로 만든다. 서명 인증서와 프로비저닝은 Xcode가 클라우드에서 자동으로 만든다.
+
+on:
+  workflow_dispatch:
+  # 기본 브랜치에 병합하기 전에도 돌릴 수 있게: 커밋 메시지에 [testflight]를 넣어 푸시하면 실행된다
+  push:
+    paths: ["ios/**", ".github/workflows/testflight.yml"]
+
+jobs:
+  upload:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[testflight]')
+    runs-on: macos-15
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode 선택 (가장 최신)
+        run: |
+          latest=$(ls -d /Applications/Xcode_*.app | grep -v beta | sort -V | tail -1)
+          sudo xcode-select -s "$latest"
+          xcodebuild -version
+
+      - name: API 키 준비
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          missing=""
+          for name in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::저장소 Secrets에 없는 값:$missing (Settings → Secrets and variables → Actions)"
+            echo "### 업로드 전 준비가 필요해요" >> "$GITHUB_STEP_SUMMARY"
+            echo "없는 Secrets:$missing" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          case "$ASC_KEY_P8" in
+            *"BEGIN PRIVATE KEY"*) ;;
+            *) echo "::error::ASC_KEY_P8에는 .p8 파일 내용 전체(-----BEGIN PRIVATE KEY----- 포함)를 넣어야 해요"; exit 1 ;;
+          esac
+          printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/asc.p8"
+
+      - name: 프로젝트 생성
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: 아카이브
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project SignalNoise.xcodeproj \
+            -scheme SignalNoise \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/SignalNoise.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc.p8" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" | tail -50
+
+      - name: App Store Connect로 업로드
+        run: |
+          set -o pipefail
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/SignalNoise.xcarchive" \
+            -exportOptionsPlist AppStore/ExportOptions.plist \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc.p8" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" | tail -30
+          echo "업로드 완료. 10~30분 뒤 App Store Connect → TestFlight 에서 빌드 ${{ github.run_number }}를 확인하세요." >> "$GITHUB_STEP_SUMMARY"

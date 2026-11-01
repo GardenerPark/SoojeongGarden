@@ -1,0 +1,10 @@
+*.xcodeproj/
+xcuserdata/
+DerivedData/
+.build/
+.swiftpm/
+# XcodeGen이 project.yml에서 만들어 준다
+SignalNoise/Info.plist
+SignalNoise/SignalNoise.entitlements
+SignalNoiseWidget/Info.plist
+SignalNoiseWidget/SignalNoiseWidget.entitlements

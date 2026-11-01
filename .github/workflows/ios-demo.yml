@@ -1,0 +1,117 @@
+name: iOS demo
+
+# 실제 iOS 시뮬레이터에서 하루 루프 UI 테스트를 돌리며 녹화하고, App Store 스크린샷을 남긴다.
+# Actions 탭에서 직접 실행하거나, 커밋 메시지에 [demo]를 넣어 푸시하면 실행된다.
+on:
+  workflow_dispatch:
+  push:
+    paths: ["ios/**", ".github/workflows/ios-demo.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  demo:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[demo]')
+    runs-on: macos-15
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode 선택 (가장 최신)
+        run: |
+          latest=$(ls -d /Applications/Xcode_*.app | grep -v beta | sort -V | tail -1)
+          sudo xcode-select -s "$latest"
+          xcodebuild -version
+
+      - name: 프로젝트 생성
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: 시뮬레이터 준비 (가장 큰 iPhone)
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys, re
+          devs = [d for rt, ds in json.load(sys.stdin)["devices"].items() if "iOS" in rt for d in ds]
+          pick = [d for d in devs if "Pro Max" in d["name"]] or [d for d in devs if "iPhone" in d["name"]]
+          pick.sort(key=lambda d: [int(x) for x in re.findall(r"\d+", d["name"])] or [0])
+          print(pick[-1]["udid"]); print(pick[-1]["name"], file=sys.stderr)')
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl ui "$UDID" appearance light
+          # 처음 키보드를 쓸 때 뜨는 "밀어서 입력" 안내를 끈다
+          xcrun simctl spawn "$UDID" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true
+          xcrun simctl status_bar "$UDID" override --time "9:41" --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3
+
+      - name: 빌드
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing -project SignalNoise.xcodeproj -scheme SignalNoise \
+            -destination "id=$UDID" -derivedDataPath build CODE_SIGNING_ALLOWED=NO | tail -5
+
+      - name: 녹화하며 하루 루프 실행
+        run: |
+          mkdir -p out/screenshots
+          xcrun simctl io "$UDID" recordVideo --codec h264 --force out/raw.mov &
+          REC=$!
+          sleep 2
+          set +e
+          xcodebuild test-without-building -project SignalNoise.xcodeproj -scheme SignalNoise \
+            -destination "id=$UDID" -derivedDataPath build \
+            -resultBundlePath out/DayLoop.xcresult \
+            TEST_RUNNER_SCREENSHOT_DIR="$PWD/out/screenshots" | tail -40
+          STATUS=${PIPESTATUS[0]}
+          kill -INT $REC; wait $REC
+          brew install ffmpeg >/dev/null 2>&1 || true
+          ffmpeg -y -loglevel error -i out/raw.mov -vf "scale=-2:1280" -c:v libx264 -pix_fmt yuv420p -movflags +faststart out/demo.mp4 || cp out/raw.mov out/demo.mov
+          rm -f out/raw.mov
+          # UI 테스트가 찍은 스크린샷(첨부)을 결과 번들에서 꺼낸다
+          xcrun xcresulttool export attachments --path out/DayLoop.xcresult --output-path out/attachments || true
+          python3 - <<'PY'
+          import json, os, shutil
+          src = "out/attachments"
+          manifest = os.path.join(src, "manifest.json")
+          if os.path.exists(manifest):
+              for test in json.load(open(manifest)):
+                  for a in test.get("attachments", []):
+                      name = a.get("suggestedHumanReadableName", a["exportedFileName"]).split("_")[0]
+                      shutil.copy(os.path.join(src, a["exportedFileName"]), f"out/screenshots/{name}.png")
+          PY
+          ls -la out out/screenshots
+          echo "STATUS=$STATUS" >> "$GITHUB_ENV"
+
+      - name: 결과를 ios-demo-output 브랜치에 올리기
+        if: always()
+        run: |
+          mkdir -p /tmp/demo-out && cd /tmp/demo-out
+          cp "$GITHUB_WORKSPACE"/ios/out/demo.* . 2>/dev/null || true
+          cp -R "$GITHUB_WORKSPACE"/ios/out/screenshots . 2>/dev/null || true
+          printf 'commit: %s\ntest exit: %s\n' "${{ github.sha }}" "${STATUS:-?}" > RESULT.txt
+          git init -q -b ios-demo-output
+          git add -A
+          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit -qm "iOS demo for ${{ github.sha }}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ios-demo-output
+
+      - name: 테스트 결과
+        run: exit "${STATUS:-1}"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-demo
+          path: |
+            ios/out/demo.mp4
+            ios/out/demo.mov
+            ios/out/screenshots
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: xcresult
+          path: ios/out/DayLoop.xcresult
