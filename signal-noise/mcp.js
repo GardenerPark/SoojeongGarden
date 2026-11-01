@@ -112,11 +112,11 @@ const fail = (id, code, message) => ({ jsonrpc: '2.0', id, error: { code, messag
 export function createMcpHandler(service) {
   const byName = new Map(TOOLS.map((t) => [t.name, t]));
 
-  function callTool({ name, arguments: args = {} } = {}) {
+  async function callTool({ name, arguments: args = {} } = {}) {
     const tool = byName.get(name);
     if (!tool) return { content: [{ type: 'text', text: `알 수 없는 도구예요: ${name}` }], isError: true };
     try {
-      const result = service.run(tool.op, tool.map ? tool.map(args) : args);
+      const result = await service.run(tool.op, tool.map ? tool.map(args) : args);
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     } catch (e) {
       if (!(e instanceof SNError)) console.error('[mcp]', e);
@@ -125,7 +125,7 @@ export function createMcpHandler(service) {
   }
 
   // 응답이 없는 메시지(알림, 응답)는 null.
-  return function handle(msg) {
+  return async function handle(msg) {
     if (!msg || msg.jsonrpc !== '2.0' || typeof msg.method !== 'string') {
       return msg && 'id' in msg && !('result' in msg || 'error' in msg) ? fail(msg.id ?? null, -32600, 'Invalid Request') : null;
     }
@@ -146,7 +146,7 @@ export function createMcpHandler(service) {
       case 'tools/list':
         return ok(id, { tools: TOOLS.map(({ op, map, ...t }) => t) });
       case 'tools/call':
-        return ok(id, callTool(params));
+        return ok(id, await callTool(params));
       default:
         return fail(id, -32601, `Method not found: ${method}`);
     }

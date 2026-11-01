@@ -17,7 +17,7 @@ const handle = createMcpHandler(
 
 const write = (msg) => process.stdout.write(JSON.stringify(msg) + '\n');
 
-createInterface({ input: process.stdin }).on('line', (line) => {
+createInterface({ input: process.stdin }).on('line', async (line) => {
   if (!line.trim()) return;
   let msg;
   try {
@@ -25,6 +25,6 @@ createInterface({ input: process.stdin }).on('line', (line) => {
   } catch {
     return write({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } });
   }
-  const replies = (Array.isArray(msg) ? msg : [msg]).map(handle).filter(Boolean);
+  const replies = (await Promise.all((Array.isArray(msg) ? msg : [msg]).map(handle))).filter(Boolean);
   if (replies.length) write(Array.isArray(msg) ? replies : replies[0]);
 });
