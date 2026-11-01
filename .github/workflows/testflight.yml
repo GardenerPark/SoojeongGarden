@@ -34,10 +34,26 @@ jobs:
 
       - name: API 키 준비
         env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
         run: |
-          test -n "$ASC_KEY_P8" || { echo "::error::ASC_KEY_P8 secret이 없어요"; exit 1; }
-          printf '%s' "$ASC_KEY_P8" > "$RUNNER_TEMP/asc.p8"
+          missing=""
+          for name in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::저장소 Secrets에 없는 값:$missing (Settings → Secrets and variables → Actions)"
+            echo "### 업로드 전 준비가 필요해요" >> "$GITHUB_STEP_SUMMARY"
+            echo "없는 Secrets:$missing" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          case "$ASC_KEY_P8" in
+            *"BEGIN PRIVATE KEY"*) ;;
+            *) echo "::error::ASC_KEY_P8에는 .p8 파일 내용 전체(-----BEGIN PRIVATE KEY----- 포함)를 넣어야 해요"; exit 1 ;;
+          esac
+          printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/asc.p8"
 
       - name: 프로젝트 생성
         run: |
