@@ -92,3 +92,16 @@ jobs:
             -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" | tail -30
           echo "업로드 완료. 10~30분 뒤 App Store Connect → TestFlight 에서 빌드 ${{ github.run_number }}를 확인하세요." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 실패 시 배포 로그 보관
+        if: failure()
+        run: |
+          mkdir -p "$RUNNER_TEMP/distlogs"
+          cp -R "$TMPDIR"/*.xcdistributionlogs "$RUNNER_TEMP/distlogs/" 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: xcdistributionlogs
+          path: ${{ runner.temp }}/distlogs
+          if-no-files-found: ignore
