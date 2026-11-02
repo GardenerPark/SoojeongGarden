@@ -80,9 +80,12 @@ jobs:
       - name: App Store Connect로 업로드
         run: |
           set -o pipefail
+          # 로컬 서명 아카이브에는 팀 정보가 없어서 내보내기 옵션에 팀을 넣어 준다
+          cp AppStore/ExportOptions.plist "$RUNNER_TEMP/ExportOptions.plist"
+          /usr/libexec/PlistBuddy -c "Add :teamID string ${{ secrets.APPLE_TEAM_ID }}" "$RUNNER_TEMP/ExportOptions.plist"
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/SignalNoise.xcarchive" \
-            -exportOptionsPlist AppStore/ExportOptions.plist \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
             -exportPath "$RUNNER_TEMP/export" \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$RUNNER_TEMP/asc.p8" \
