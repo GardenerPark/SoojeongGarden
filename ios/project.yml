@@ -45,6 +45,8 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        # 세로 고정 앱 → iPad 멀티태스킹(모든 방향 요구) 검증에서 빠지도록 전체 화면을 요구한다
+        UIRequiresFullScreen: true
         NSMicrophoneUsageDescription: 말로 쏟아내고, 말로 다음 하나를 시작하기 위해 마이크를 써요.
         NSSpeechRecognitionUsageDescription: 말한 내용을 글로 바꾸기 위해 음성 인식을 써요. 가능하면 기기 안에서만 처리해요.
         CFBundleURLTypes:
