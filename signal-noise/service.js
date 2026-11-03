@@ -42,6 +42,8 @@ export function memoryStore(initial = core.emptyState()) {
 }
 
 const WRITE = {
+  morning: core.writeMorning,
+  reopenMorning: core.reopenMorning,
   dump: core.addDump,
   setOne: core.setOne,
   start: core.startBlock,
@@ -50,10 +52,12 @@ const WRITE = {
   sort: core.sortDump,
   finishReview: core.finishReview,
   close: core.closeDay,
+  reset: core.resetDay,
 };
 const READ = {
   view: (s, _a, ctx) => core.view(s, ctx),
-  day: (s, a, ctx) => core.summary(s, a?.date || ctx.date),
+  day: (s, a, ctx) => core.dayRecord(s, a?.date || ctx.date),
+  history: (s, a) => core.history(s, a),
   list: (s, a) => core.listDumps(s, a),
 };
 export const OPS = [...Object.keys(WRITE), ...Object.keys(READ)];

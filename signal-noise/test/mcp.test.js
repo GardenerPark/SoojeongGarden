@@ -20,17 +20,17 @@ test('MCP: 초기화, 도구 목록, 도구 호출', async () => {
   assert.equal(await handle({ jsonrpc: '2.0', method: 'notifications/initialized' }), null);
 
   const names = (await handle({ jsonrpc: '2.0', id: 2, method: 'tools/list' })).result.tools.map((t) => t.name);
-  assert.deepEqual(names, ['get_today', 'add_thought', 'set_today_one', 'start_block', 'end_block', 'list_thoughts', 'sort_thought', 'close_day', 'get_day']);
+  assert.deepEqual(names, ['get_today', 'write_morning_page', 'add_thought', 'set_today_one', 'start_block', 'end_block', 'list_thoughts', 'sort_thought', 'close_day', 'get_day', 'list_days']);
 
   await call(handle, 3, 'add_thought', { text: '유튜브 촬영' });
   await call(handle, 4, 'set_today_one', { one: '유튜브 촬영' });
-  const block = await parse(call(handle, 5, 'start_block', { declaration: '필라테스 2시간' }));
+  const block = await parse(call(handle, 5, 'start_block', { declaration: '필라테스 2시간', related: false }));
   assert.equal(block.title, '필라테스');
   assert.equal(block.related, false);
 
   const busy = await call(handle, 6, 'start_block', { declaration: '편집 30분' });
   assert.equal(busy.result.isError, true);
-  assert.match(busy.result.content[0].text, /지금 하는 블록/);
+  assert.match(busy.result.content[0].text, /지금 집중하는 게 있어요/);
 
   assert.equal((await parse(call(handle, 7, 'get_today'))).phase, 'focus');
   assert.equal((await handle({ jsonrpc: '2.0', id: 8, method: 'nope' })).error.code, -32601);
@@ -85,6 +85,6 @@ test('Vercel 함수: rewrites가 넘긴 원래 경로로 처리하고, 토큰이
   assert.equal(res.code, 200);
   const res2 = fakeRes();
   await api(req('/mcp', { jsonrpc: '2.0', id: 1, method: 'tools/list' }), res2);
-  assert.equal(JSON.parse(res2.body).result.tools.length, 9);
+  assert.equal(JSON.parse(res2.body).result.tools.length, 11);
   assert.equal(await api(req('/index.html'), fakeRes()), false);
 });

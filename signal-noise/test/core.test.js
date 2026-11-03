@@ -20,57 +20,106 @@ test('말로 한 선언을 이름과 시간으로 나눈다', () => {
   assert.deepEqual(parseDeclaration('5 mangoes 사기'), { title: '5 mangoes 사기', minutes: null });
 });
 
-test('하루 루프: 아침 → 오늘의 하나 → 블록 → 회고 → 마무리', async () => {
-  const { run } = setup();
-  assert.equal((await run('view')).phase, 'morning');
-  const a = await run('dump', { text: '유튜브 촬영' });
-  await run('dump', { text: '필라테스 예약' });
-  await run('dump', { text: '엄마 생일' });
-  assert.equal((await run('view')).morning.length, 3);
+test('하루 루프: 모닝페이지 → 오늘의 하나 → 오늘 ⇄ 집중 → 마무리', async () => {
+  const { run, at } = setup('2026-10-31T00:00:00Z'); // 서울 09:00
+  let v = await run('view');
+  assert.equal(v.phase, 'morning');
+  assert.equal(v.morningDone, false);
 
-  await run('setOne', { one: '유튜브 촬영', some: ['필라테스'], fromIds: [a.id] });
-  const v = await run('view');
-  assert.equal(v.phase, 'next');
-  // 고르지 않은 아침 생각은 보관함으로
-  assert.deepEqual((await run('list', { status: 'archive' })).map((t) => t.text), ['필라테스 예약', '엄마 생일']);
+  // 모닝페이지는 줄글 그대로 남는다
+  const page = '영상 업로드 이번 주에 꼭.\n세금 서류도 봐야 하고\n필라테스 예약';
+  await run('morning', { text: page });
+  await run('morning', { text: page, done: true });
+  v = await run('view');
+  assert.equal(v.morningPage, page);
+  assert.equal(v.morningDone, true);
 
-  await run('start', { declaration: '촬영 대본 정리 90분', related: true });
-  const focus = await run('view');
-  assert.equal(focus.phase, 'focus');
-  assert.equal(focus.active.minutes, 90);
-  assert.equal(focus.review, undefined, '집중 중에는 쏟아낸 목록을 보내지 않는다');
+  await run('setOne', { one: '유튜브 영상 업로드', some: ['세금 서류'] });
+  v = await run('view');
+  assert.equal(v.phase, 'home');
+  assert.deepEqual(v.timeline, []);
 
-  await assert.rejects(() => run('start', { declaration: '메일 10분' }), SNError, '한 번에 하나만');
+  // 집중 → 끝 → 오늘로
+  at('2026-10-31T00:10:00Z');
+  await run('start', { title: '촬영 대본 정리', minutes: 50 });
+  v = await run('view');
+  assert.equal(v.phase, 'focus');
+  assert.equal(v.active.related, true, '기본은 오늘의 하나를 위한 집중');
+  assert.equal(v.review, undefined, '집중 중에는 던진 생각 목록을 보내지 않는다');
+  await assert.rejects(() => run('start', { title: '메일' }), SNError, '한 번에 하나만');
   const idea = await run('dump', { text: '썸네일 문구 아이디어' });
   assert.equal(idea.state, 'inbox');
 
-  const ended = await run('end', { note: '대본 완성' });
-  assert.equal(ended.review.length, 1);
+  at('2026-10-31T01:00:00Z');
+  await run('end', { note: '대본 완성' });
   assert.equal((await run('view')).phase, 'review');
   await run('sort', { id: idea.id, action: 'now' });
   await run('finishReview');
-  const next = await run('view');
-  assert.equal(next.phase, 'next');
-  assert.equal(next.candidates[0].text, '썸네일 문구 아이디어');
+  v = await run('view');
+  assert.equal(v.phase, 'home');
+  assert.equal(v.candidates[0].text, '썸네일 문구 아이디어');
+  assert.equal(v.lastActivityAt, '2026-10-31T01:00:00.000Z');
 
-  await run('start', { declaration: '필라테스 2시간' }); // 오늘의 하나와 다른 블록
+  // 사이에 한 일은 다음 집중을 시작할 때 남긴다
+  at('2026-10-31T03:30:00Z');
+  await run('start', { title: '촬영', related: true, between: '필라테스, 점심' });
+  at('2026-10-31T04:30:00Z');
   await run('end');
   await run('finishReview');
-  await run('dump', { text: '노트북 수리' });
+  v = await run('view');
+  assert.deepEqual(
+    v.timeline.map((x) => [x.kind, x.title || x.text]),
+    [['focus', '촬영 대본 정리'], ['between', '필라테스, 점심'], ['focus', '촬영']],
+  );
+  assert.equal(v.timeline[1].at, '2026-10-31T01:00:00.000Z', '사이 기록은 직전 집중이 끝난 때부터');
 
   const s = await run('close');
   assert.equal(s.finishedCount, 2);
-  assert.equal(s.relatedCount, 1);
+  assert.equal(s.relatedCount, 2);
+  assert.equal(s.morningPage, page);
   assert.equal((await run('view')).phase, 'closed');
-  // 남은 것(now 후보, 거르지 않은 것)은 내일 아침 보관함으로
-  const archive = (await run('list', { status: 'archive' })).map((t) => t.text);
-  assert.ok(archive.includes('썸네일 문구 아이디어'));
-  assert.ok(archive.includes('노트북 수리'));
+  assert.ok((await run('list', { status: 'archive' })).map((t) => t.text).includes('썸네일 문구 아이디어'));
+});
+
+test('날짜별 기록과 하루 기록', async () => {
+  const { run, at } = setup('2026-10-31T00:00:00Z');
+  await run('morning', { text: '첫날', done: true });
+  await run('setOne', { one: '촬영' });
+  await run('start', { title: '대본' });
+  at('2026-10-31T01:00:00Z');
+  await run('end');
+  at('2026-11-01T00:00:00Z'); // 다음 날
+  await run('setOne', { one: '편집' });
+  const days = await run('history');
+  assert.deepEqual(days.map((d) => [d.date, d.one, d.finishedCount]), [['2026-11-01', '편집', 0], ['2026-10-31', '촬영', 1]]);
+  const first = await run('day', { date: '2026-10-31' });
+  assert.equal(first.morningPage, '첫날');
+  assert.equal(first.timeline[0].title, '대본');
+});
+
+test('오늘 처음부터 다시: 오늘 것만 지우고, 오늘 고른 지난 생각은 보관함으로 되돌린다', async () => {
+  const { run, at } = setup('2026-10-31T00:00:00Z');
+  await run('setOne', { one: '어제 것' });
+  const old = await run('dump', { text: '조명 사기' });
+  await run('close');
+  at('2026-11-01T00:00:00Z');
+  await run('morning', { text: '테스트', done: true });
+  await run('setOne', { one: '조명 사기', fromIds: [old.id] });
+  await run('start', { title: '테스트 집중' });
+  await run('dump', { text: '오늘 던진 생각' });
+
+  await run('reset');
+  const v = await run('view');
+  assert.equal(v.phase, 'morning');
+  assert.equal(v.morningPage, '');
+  assert.deepEqual(v.archive.map((t) => t.text), ['조명 사기'], '고른 지난 생각은 보관함으로 돌아온다');
+  assert.equal((await run('day', { date: '2026-10-31' })).one, '어제 것', '지난 날은 그대로');
+  assert.deepEqual((await run('history')).map((d) => d.date), ['2026-10-31']);
 });
 
 test('오늘의 하나 없이는 블록을 시작하지 않고, 썸은 2개까지', async () => {
   const { run } = setup();
-  await assert.rejects(() => run('start', { declaration: '메일 10분' }), /오늘의 하나/);
+  await assert.rejects(() => run('start', { title: '메일' }), /오늘의 하나/);
   await assert.rejects(() => run('setOne', { one: '촬영', some: ['a', 'b', 'c'] }), /2개/);
   await assert.rejects(() => run('setOne', { one: '  ' }), SNError);
 });

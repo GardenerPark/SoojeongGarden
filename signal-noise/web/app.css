@@ -101,3 +101,24 @@ textarea.field { resize: none; min-height: 60px; line-height: 1.5; }
   .sheet { animation: up .18s ease-out; }
   @keyframes up { from { transform: translateY(24px); opacity: 0; } }
 }
+
+/* 모닝페이지: 줄글로 쭉 */
+textarea.field.page { min-height: 46vh; font-size: 17px; line-height: 1.7; resize: vertical; }
+.pagebox { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+.pagebox summary { cursor: pointer; font-size: 14px; color: var(--muted); }
+.pagebox p, .pagetext { margin: 10px 0 0; white-space: pre-wrap; font-size: 15px; line-height: 1.7; max-height: 40vh; overflow: auto; }
+.pagetext { margin: 0; border-left: 2px solid var(--line); padding-left: 12px; }
+
+/* 오늘 한 일: 집중은 진하게, 사이에 한 일은 연하게 */
+.timeline li span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.timeline li small { font-size: 12px; font-weight: 400; color: var(--muted); }
+.timeline li.gap { border-left-style: dashed; font-size: 14px; }
+.row.links { justify-content: center; gap: 4px; }
+.row.links > .link { flex: 0 0 auto; }
+.link.back { padding-left: 0; text-decoration: none; color: var(--ink); }
+
+/* 기록 */
+.days { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.dayrow { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: transparent; }
+.dayrow b { font-size: 16px; }
+.dayrow:hover { border-color: var(--ink); }

@@ -4,12 +4,14 @@
 import { SNError } from './core.js';
 
 const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
-const SERVER_INFO = { name: 'signal-noise', title: 'Signal & Noise', version: '0.1.0' };
+const SERVER_INFO = { name: 'signal-noise', title: 'Signal & Noise', version: '0.2.0' };
 
 const INSTRUCTIONS = `Signal & Noise는 "하나 끝내고 다음 하나"를 돕는 하루 집중 앱입니다.
-- 오늘의 하나: 아침에 정하는 하루의 기준(하루 1개). 썸은 부가 우선순위로 최대 2개.
-- 블록: 지금 실제로 하는 일. 한 번에 하나만 열 수 있고, 오늘의 하나와 다른 일(운동, 루틴)도 블록이 된다.
-- 떠오른 생각은 add_thought로 바로 던진다. 분류는 블록이 끝난 뒤 전환 회고에서 sort_thought로 한다.
+- 모닝페이지: 아침에 줄글로 쭉 쓰는 글. 나누지 않고 그대로 남긴다.
+- 오늘의 하나: 오늘 끝내고 싶은 결과 하나(하루 1개). 썸은 부가 우선순위로 최대 2개.
+- 집중(블록): 지금 앉아서 하는 행동. 앉아서 집중할 때만 시작하고, 한 번에 하나만 열 수 있다.
+- 사이에 한 일: 집중과 집중 사이에 한 일(이동, 식사, 운동). 다음 집중을 시작할 때 between으로 한 줄 남긴다.
+- 떠오른 생각은 add_thought로 바로 던진다. 분류는 집중이 끝난 뒤 sort_thought로 한다.
 판단은 사용자가 한다. 사용자가 요청하지 않은 정리나 삭제(drop)는 하지 말고 제안만 하세요.`;
 
 const str = (description) => ({ type: 'string', description });
@@ -18,10 +20,17 @@ export const TOOLS = [
   {
     name: 'get_today',
     title: '오늘 상태 보기',
-    description: '오늘의 하나, 지금 블록, 지금 단계(morning/focus/review/next/closed)와 그 단계에 필요한 목록을 돌려준다.',
+    description: '오늘의 하나, 지금 집중, 지금 단계(morning/home/focus/review/closed)와 그 단계에 필요한 목록을 돌려준다. home에는 오늘 한 일 타임라인이 있다.',
     inputSchema: { type: 'object', properties: {} },
     annotations: { readOnlyHint: true },
     op: 'view',
+  },
+  {
+    name: 'write_morning_page',
+    title: '모닝페이지 쓰기',
+    description: '오늘의 모닝페이지 전체를 이 글로 바꾼다. 이어 쓰려면 get_today의 morningPage 뒤에 붙여서 넣는다. done이 true면 다 쓴 것으로 표시한다.',
+    inputSchema: { type: 'object', properties: { text: str('모닝페이지 전체 글'), done: { type: 'boolean' } }, required: ['text'] },
+    op: 'morning',
   },
   {
     name: 'add_thought',
@@ -48,24 +57,25 @@ export const TOOLS = [
   },
   {
     name: 'start_block',
-    title: '블록 시작',
-    description: '지금 할 일 하나를 블록으로 시작한다. declaration에 "필라테스 2시간", "촬영 대본 정리 90분"처럼 말한 그대로 넣으면 이름과 시간을 나눈다. 이미 열린 블록이 있으면 실패한다.',
+    title: '집중 시작',
+    description: '지금 앉아서 할 일 하나로 집중을 시작한다. title과 minutes를 주거나, declaration에 "촬영 대본 정리 90분"처럼 말한 그대로 넣으면 이름과 시간을 나눈다. between에 직전 집중 이후 한 일을 적으면 함께 남는다. 이미 집중 중이면 실패한다.',
     inputSchema: {
       type: 'object',
       properties: {
         declaration: str('말로 한 시작 선언'),
-        title: str('블록 이름 (declaration 대신)'),
-        minutes: { type: 'integer', minimum: 1, maximum: 720, description: '예정 시간(분)' },
-        related: { type: 'boolean', description: '오늘의 하나를 위한 블록인지' },
+        title: str('집중할 일 (declaration 대신)'),
+        minutes: { type: 'integer', minimum: 1, maximum: 720, description: '예정 시간(분), 없으면 끝낼 때까지' },
+        related: { type: 'boolean', description: '오늘의 하나를 위한 집중인지 (기본 true)' },
         fromId: str('다음 하나 후보(now)에서 고른 생각의 id'),
+        between: str('직전 집중 이후 한 일 (예: 이동, 점심)'),
       },
     },
     op: 'start',
   },
   {
     name: 'end_block',
-    title: '블록 끝내기',
-    description: '지금 블록을 끝내고 전환 회고로 넘어간다. 거를 생각 목록(review)을 함께 돌려준다.',
+    title: '집중 끝내기',
+    description: '지금 집중을 끝낸다. 거를 생각 목록(review)을 함께 돌려준다. 거르고 나면 오늘 화면(home)으로 돌아간다.',
     inputSchema: { type: 'object', properties: { note: str('어디까지 했는지 한 줄') } },
     op: 'end',
   },
@@ -92,17 +102,25 @@ export const TOOLS = [
   {
     name: 'close_day',
     title: '하루 마무리',
-    description: '오늘을 마무리한다. 열린 블록은 끝내고, 거르지 않은 생각은 내일 아침 보관함으로 보낸다. 끝낸 하나의 수를 돌려준다.',
+    description: '오늘을 마무리한다. 열린 집중은 끝내고, 거르지 않은 생각은 내일 아침 보관함으로 보낸다. 끝낸 하나의 수를 돌려준다.',
     inputSchema: { type: 'object', properties: {} },
     op: 'close',
   },
   {
     name: 'get_day',
     title: '하루 기록 보기',
-    description: '날짜별 기록: 오늘의 하나, 블록 목록, 끝낸 하나의 수(finishedCount), 그중 오늘의 하나를 위한 블록 수(relatedCount).',
+    description: '날짜별 기록: 모닝페이지, 오늘의 하나, 집중과 사이에 한 일 타임라인, 끝낸 집중 수(finishedCount), 그중 오늘의 하나를 위한 수(relatedCount).',
     inputSchema: { type: 'object', properties: { date: str('YYYY-MM-DD, 없으면 오늘') } },
     annotations: { readOnlyHint: true },
     op: 'day',
+  },
+  {
+    name: 'list_days',
+    title: '날짜별 목록',
+    description: '기록이 있는 날을 최근부터: 날짜, 오늘의 하나, 끝낸 집중 수.',
+    inputSchema: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 365 } } },
+    annotations: { readOnlyHint: true },
+    op: 'history',
   },
 ];
 
