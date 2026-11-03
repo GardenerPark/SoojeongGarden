@@ -1,6 +1,6 @@
 // 앱 껍데기만 저장해 두어, 연결이 없어도 앱이 열리고 기기에 보관한 메모를 쓸 수 있게 한다.
 // 먼저 네트워크에서 받고, 안 되면 저장해 둔 것을 쓴다. /api는 건드리지 않는다.
-const CACHE = 'notes-shell-v1';
+const CACHE = 'notes-shell-v2';
 const SHELL = ['/', '/index.html', '/app.js', '/app.css', '/icon.svg', '/manifest.webmanifest'];
 
 self.addEventListener('install', (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())));

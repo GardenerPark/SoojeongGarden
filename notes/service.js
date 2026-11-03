@@ -32,7 +32,7 @@ export class Conflict extends Error {
 
 export const OPS = ['meta', 'list', 'get', 'create', 'save', 'append'];
 
-const FIELDS = ['title', 'body', 'tags', 'kind'];
+const FIELDS = ['title', 'body', 'tags', 'kind', 'status'];
 const sameTags = (a = [], b = []) => a.length === b.length && [...a].sort().join('\u0000') === [...b].sort().join('\u0000');
 const sameField = (f, a, b) => (f === 'tags' ? sameTags(a, b) : (a ?? '') === (b ?? ''));
 
@@ -42,6 +42,7 @@ function cleanNext(next = {}) {
     body: normalizeBody(next.body ?? ''),
     tags: [...new Set((next.tags || []).map(String))],
     kind: next.kind ? String(next.kind) : null,
+    status: next.status ? String(next.status) : null,
   };
   if (out.body.length > 200000) throw new NotesError('메모가 너무 길어요.');
   return out;
@@ -78,6 +79,7 @@ export function createService({ notion, dbId, timeZone = 'Asia/Seoul', clock = (
       schema = {
         tags: (props[PROP.tags]?.multi_select?.options || []).map((o) => o.name),
         kinds: (props[PROP.kind]?.select?.options || []).map((o) => o.name),
+        statuses: (props[PROP.status]?.select?.options || []).map((o) => o.name),
         url: db.url,
         title: richText(db.title) || '생각과 자료',
       };
@@ -133,6 +135,7 @@ export function createService({ notion, dbId, timeZone = 'Asia/Seoul', clock = (
     if (only.includes('title')) props[PROP.title] = { title: next.title ? [{ type: 'text', text: { content: next.title } }] : [] };
     if (only.includes('tags')) props[PROP.tags] = { multi_select: next.tags.map((name) => ({ name })) };
     if (only.includes('kind')) props[PROP.kind] = { select: next.kind ? { name: next.kind } : null };
+    if (only.includes('status')) props[PROP.status] = { select: next.status ? { name: next.status } : null };
     return props;
   }
 
@@ -145,6 +148,7 @@ export function createService({ notion, dbId, timeZone = 'Asia/Seoul', clock = (
       if (still.length) throw new NotesError(`노션에 없는 태그예요: ${still.join(', ')}`);
     }
     if (next.kind && !(await getSchema()).kinds.includes(next.kind)) throw new NotesError(`노션에 없는 분류예요: ${next.kind}`);
+    if (next.status && !(await getSchema()).statuses.includes(next.status)) throw new NotesError(`노션에 없는 정리 상태예요: ${next.status}`);
   }
 
   // 본문을 next 줄로 맞춘다. 모든 블록이 단순할 때만 부른다.
@@ -218,6 +222,8 @@ export function createService({ notion, dbId, timeZone = 'Asia/Seoul', clock = (
     async create({ next }) {
       const n = cleanNext(next);
       if (!n.title && !n.body) throw new NotesError('빈 메모는 저장하지 않아요.');
+      // 앱에서 새로 쓴 것은 "메모" 단계: 노션 정리 상태 '새로 담음'
+      if (!n.status && (await getSchema()).statuses.includes('새로 담음')) n.status = '새로 담음';
       await checkOptions(n);
       // 저장 응답을 못 받고 다시 보낸 경우: 방금 같은 제목·본문으로 만든 메모가 있으면 그것을 쓴다.
       const since = new Date(clock().getTime() - 15 * 60000).toISOString();

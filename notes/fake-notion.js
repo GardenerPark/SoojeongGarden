@@ -8,6 +8,7 @@ const minute = (d) => new Date(Math.floor(d.getTime() / 60000) * 60000).toISOStr
 export const SAMPLE_SCHEMA = {
   tags: ['일상', '명상', '몸과 에너지', '일과 전환', '관계', '배움', '창작'],
   kinds: ['질문·단상', '아이디어', '정보·레퍼런스', '경험·회고'],
+  statuses: ['새로 담음', '보관', '프로젝트 연결'],
 };
 
 export function createFakeNotion({ clock = () => new Date(), schema = SAMPLE_SCHEMA } = {}) {
@@ -36,7 +37,7 @@ export function createFakeNotion({ clock = () => new Date(), schema = SAMPLE_SCH
     dbId,
     pages,
     // 테스트용: 노션에서 직접 고친 것처럼
-    seed({ title, oneLine = '', tags = [], kind = null, created }) {
+    seed({ title, oneLine = '', tags = [], kind = null, status = null, created }) {
       const id = randomUUID();
       const at = created || minute(clock());
       pages.set(id, {
@@ -51,6 +52,7 @@ export function createFakeNotion({ clock = () => new Date(), schema = SAMPLE_SCH
           '한 줄 생각': { type: 'rich_text', rich_text: rt(oneLine) },
           주제: { type: 'multi_select', multi_select: tags.map((name) => ({ name })) },
           '기록 유형': { type: 'select', select: kind ? { name: kind } : null },
+          '정리 상태': { type: 'select', select: status ? { name: status } : null },
           출처: { type: 'url', url: null },
           활용처: { type: 'multi_select', multi_select: [] },
         },
@@ -76,6 +78,7 @@ export function createFakeNotion({ clock = () => new Date(), schema = SAMPLE_SCH
         properties: {
           주제: { type: 'multi_select', multi_select: { options: schema.tags.map((name) => ({ name })) } },
           '기록 유형': { type: 'select', select: { options: schema.kinds.map((name) => ({ name })) } },
+          '정리 상태': { type: 'select', select: { options: (schema.statuses || []).map((name) => ({ name })) } },
         },
       };
     },
@@ -107,6 +110,7 @@ export function createFakeNotion({ clock = () => new Date(), schema = SAMPLE_SCH
         title: p['생각 제목']?.title?.[0]?.text?.content || '',
         tags: (p['주제']?.multi_select || []).map((o) => o.name),
         kind: p['기록 유형']?.select?.name || null,
+        status: p['정리 상태']?.select?.name || null,
       });
       if (body.children?.length) api.rawAppend(id, body.children);
       return structuredClone(pages.get(id));
@@ -186,6 +190,7 @@ export function seedDemo(fake) {
     oneLine: '회사에선 성과가 대신 걸러주던 걸, 탐색기엔 매일 아침 내가 정해야 한다.',
     tags: ['일과 전환'],
     kind: '경험·회고',
+    status: '보관',
     created: ago(2),
   });
   const a = fake.seed({ title: '자격은 하고 싶은 마음이면 충분하다', tags: ['일과 전환', '창작'], kind: '질문·단상', created: ago(30) });
@@ -199,7 +204,7 @@ export function seedDemo(fake) {
     { type: 'bulleted_list_item', bulleted_list_item: { rich_text: [{ type: 'text', text: { content: '날숨을 들숨보다 길게' } }] } },
     { type: 'bulleted_list_item', bulleted_list_item: { rich_text: [{ type: 'text', text: { content: '어깨 내리기' } }] } },
   ]);
-  const c = fake.seed({ title: '유튜브 레퍼런스 영상 모음', oneLine: '선택한 참고 영상 16개와 추가 링크·기존 분석 메모 모음.', tags: ['창작'], kind: '정보·레퍼런스', created: ago(200) });
+  const c = fake.seed({ title: '유튜브 레퍼런스 영상 모음', oneLine: '선택한 참고 영상 16개와 추가 링크·기존 분석 메모 모음.', tags: ['창작'], kind: '정보·레퍼런스', status: '보관', created: ago(200) });
   fake.rawAppend(c, [
     { type: 'paragraph', paragraph: { rich_text: [{ type: 'text', text: { content: '편집 리듬이 좋은 영상들.' } }] } },
     { type: 'image', image: { type: 'external', external: { url: 'https://example.com/a.png' }, caption: [] } },

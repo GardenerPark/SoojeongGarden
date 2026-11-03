@@ -44,7 +44,10 @@ const state = {
   listError: null,
   needToken: false,
   filter: { tag: null, kind: null, q: '' },
+  mode: 'memo', // memo | record  (노션 정리 상태: 새로 담음 → 메모, 보관·프로젝트 연결 → 기록)
+  searchOpen: false,
 };
+const isRecord = (m) => m.status === '보관' || m.status === '프로젝트 연결';
 const outbox = load(LS.outbox, {}); // key(메모 id 또는 local-…) → { id, base, next, appends, touched, conflict }
 const status = {}; // key → { s: 'saving'|'saved'|'offline'|'failed'|'conflict', msg }
 const saveOutbox = () => store(LS.outbox, outbox);
@@ -95,6 +98,8 @@ const ICON = {
   pen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
   back: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
   info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>',
+  send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
   open: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M10 14 20 4"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>',
 };
 
@@ -133,9 +138,27 @@ function toast(msg) {
 }
 
 // ---------- 메모 내용 ----------
-const baseOf = (s) => ({ title: s.title || '', body: s.body || '', tags: s.tags || [], kind: s.kind || null });
+const baseOf = (s) => ({ title: s.title || '', body: s.body || '', tags: s.tags || [], kind: s.kind || null, status: s.status || null });
 const sameTags = (a = [], b = []) => [...a].sort().join('\u0000') === [...b].sort().join('\u0000');
-const sameContent = (a, b) => !!a && !!b && a.title === b.title && a.body === b.body && sameTags(a.tags, b.tags) && (a.kind || null) === (b.kind || null);
+const sameContent = (a, b) =>
+  !!a && !!b && a.title === b.title && a.body === b.body && sameTags(a.tags, b.tags) && (a.kind || null) === (b.kind || null) && (a.status || null) === (b.status || null);
+
+// 본문 = 처음 쓴 부분(head) + 이어 쓴 부분(tail, "↳ 날짜 시각"부터). 편집기는 head만, tail은 카드로 보여 준다.
+const MARK_RE = /^↳ \d{4}\.\d{2}\.\d{2} \d{2}:\d{2}$/;
+function splitBody(body = '') {
+  const lines = String(body).split('\n');
+  const at = lines.findIndex((l) => MARK_RE.test(l));
+  if (at < 0) return { head: body, tail: '' };
+  return { head: normBody(lines.slice(0, at).join('\n')), tail: lines.slice(at).join('\n') };
+}
+function tailEntries(tail) {
+  const out = [];
+  for (const l of tail ? tail.split('\n') : []) {
+    if (MARK_RE.test(l)) out.push({ mark: l.slice(2), lines: [] });
+    else if (out.length) out.at(-1).lines.push(l);
+  }
+  return out.map((x) => ({ mark: x.mark, text: normBody(x.lines.join('\n')) }));
+}
 const normBody = (t) => String(t || '').replace(/\r\n?/g, '\n').replace(/[\s ]+$/, '');
 const preview = (m) => {
   if (m.oneLine) return m.oneLine;
@@ -274,6 +297,7 @@ function allItems() {
   for (const [key, e] of Object.entries(outbox)) {
     const it = items.get(e.id) || { id: key, local: true, created: e.touched, edited: e.touched, tags: [], kind: null };
     if (e.next) Object.assign(it, { title: e.next.title, body: e.next.body, tags: e.next.tags, kind: e.next.kind, oneLine: it.oneLine, snippet: '' });
+      if (e.next && 'status' in e.next) it.status = e.next.status;
     if (e.touched && (!it.edited || e.touched > it.edited)) it.edited = e.touched;
     it.pending = e.conflict ? 'warn' : status[key]?.s === 'failed' ? 'warn' : 'on';
     if (!e.id && !(e.next?.title || e.next?.body)) continue;
@@ -286,11 +310,17 @@ function filtered(items) {
   const { tag, kind, q } = state.filter;
   const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
   return items.filter((m) => {
+    if ((state.mode === 'record') !== isRecord(m)) return false;
     if (tag === '__none' ? m.tags?.length : tag && !m.tags?.includes(tag)) return false;
     if (kind && m.kind !== kind) return false;
     if (!words.length) return true;
+    // "#명상"처럼 #로 시작하는 말은 태그로 찾는다
+    for (const w of words.filter((x) => x.startsWith('#') && x.length > 1))
+      if (!(m.tags || []).some((t) => t.toLowerCase().replace(/\s+/g, '').startsWith(w.slice(1)))) return false;
+    const plain = words.filter((x) => !x.startsWith('#'));
+    if (!plain.length) return true;
     const hay = [m.title, m.oneLine, m.snippet, m.body ?? bodies.get(m.id), ...(m.tags || []).map((t) => `#${t}`)].join(' ').toLowerCase();
-    return words.every((w) => hay.includes(w));
+    return plain.every((w) => hay.includes(w));
   });
 }
 
@@ -301,52 +331,105 @@ function paintListHead() {
 }
 
 function renderList() {
+  // 다시 그려도 입력 중인 칸(검색·빠른 메모)의 글과 커서는 그대로
+  const active = document.activeElement?.id;
+  const caret = active && document.activeElement.selectionStart;
+  const draft = document.getElementById('quick')?.value ?? state.quick ?? '';
   cur = null;
   if (state.needToken) return renderToken();
-  const items = allItems();
-  const shown = filtered(items);
+  const all = allItems();
+  const items = all.filter((m) => (state.mode === 'record') === isRecord(m));
+  const shown = filtered(all);
+  const memoCount = all.filter((m) => !isRecord(m)).length;
+  const recordCount = all.length - memoCount;
   const tags = [...new Set([...state.meta.tags, ...items.flatMap((m) => m.tags || [])])];
   const count = (t) => items.filter((m) => m.tags?.includes(t)).length;
   const untagged = items.filter((m) => !m.tags?.length).length;
   const kinds = state.meta.kinds.length ? state.meta.kinds : [...new Set(items.map((m) => m.kind).filter(Boolean))];
   const { tag, kind, q } = state.filter;
+  const searching = state.searchOpen || q || tag || kind;
 
-  let html = `<div class="top"><h1>생각과 자료</h1><span class="sync" id="sync"></span></div>
-    <input class="search" id="q" type="search" placeholder="검색" value="${esc(q)}" autocomplete="off">
-    <div class="chips" role="group" aria-label="태그">
-      <button class="chip ${!tag ? 'on' : ''}" data-tag="">전체<span class="n">${items.length}</span></button>
-      ${tags.filter((t) => count(t) || tag === t).map((t) => `<button class="chip ${tag === t ? 'on' : ''}" data-tag="${esc(t)}">#${esc(t)}<span class="n">${count(t)}</span></button>`).join('')}
-      ${untagged ? `<button class="chip ${tag === '__none' ? 'on' : ''}" data-tag="__none">태그 없음<span class="n">${untagged}</span></button>` : ''}
-    </div>
-    <div class="chips small" role="group" aria-label="분류">
-      ${kinds.map((k) => `<button class="chip ${kind === k ? 'on' : ''}" data-kind="${esc(k)}">${esc(k)}</button>`).join('')}
+  let html = `<header class="top">
+      <span class="brand">생각과 자료</span>
+      <div class="seg" role="tablist" aria-label="보기">
+        <button role="tab" aria-selected="${state.mode === 'memo'}" class="${state.mode === 'memo' ? 'on' : ''}" data-mode="memo">메모<span class="n">${memoCount}</span></button>
+        <button role="tab" aria-selected="${state.mode === 'record'}" class="${state.mode === 'record' ? 'on' : ''}" data-mode="record">기록<span class="n">${recordCount}</span></button>
+      </div>
+      <button class="icon" id="searchBtn" aria-label="검색과 태그" aria-expanded="${!!searching}">${ICON.search}</button>
+    </header>
+    <div class="sync" id="sync"></div>`;
+
+  if (searching) {
+    html += `<div class="find">
+      <input class="search" id="q" type="search" placeholder="검색 · #태그" value="${esc(q)}" autocomplete="off" aria-label="검색">
+      <div class="chips" role="group" aria-label="태그">
+        ${tags.filter((t) => count(t) || tag === t).map((t) => `<button class="chip ${tag === t ? 'on' : ''}" data-tag="${esc(t)}">#${esc(t)}<span class="n">${count(t)}</span></button>`).join('')}
+        ${untagged ? `<button class="chip ${tag === '__none' ? 'on' : ''}" data-tag="__none">태그 없음<span class="n">${untagged}</span></button>` : ''}
+      </div>
+      ${kinds.length ? `<div class="chips small" role="group" aria-label="분류">${kinds.map((k) => `<button class="chip ${kind === k ? 'on' : ''}" data-kind="${esc(k)}">${esc(k)}</button>`).join('')}</div>` : ''}
     </div>`;
+  }
 
-  if (!items.length) html += `<p class="empty">${state.listLoading ? '노션에서 불러오는 중…' : state.listError ? esc(state.listError) : '아직 메모가 없어요.'}</p>`;
+  const emptyMsg = state.mode === 'record' ? '아직 기록이 없어요. 메모를 열고 ⓘ에서 "기록으로" 옮길 수 있어요.' : '떠오른 생각을 아래에 바로 적어 보세요.';
+  if (!items.length) html += `<p class="empty">${state.listLoading ? '노션에서 불러오는 중…' : state.listError ? esc(state.listError) : emptyMsg}</p>`;
   else if (!shown.length) html += `<p class="empty">찾는 메모가 없어요.</p>`;
-  else {
-    if (tag || kind) {
-      const name = [tag === '__none' ? '태그 없음' : tag ? `#${tag}` : '', kind || ''].filter(Boolean).join(' · ');
-      html += `<div class="section">${esc(name)} · ${shown.length}개</div><ul class="list">${shown.map(itemHtml).join('')}</ul>`;
-    } else {
-      let last = null;
-      let open = false;
-      for (const m of shown) {
-        const s = sectionOf(m.edited || m.created);
-        if (s !== last) {
-          if (open) html += '</ul>';
-          html += `<div class="section">${esc(s)}</div><ul class="list">`;
-          open = true;
-          last = s;
-        }
-        html += itemHtml(m);
+  else if (tag || kind || q) {
+    const name = [tag === '__none' ? '태그 없음' : tag ? `#${tag}` : '', kind || '', q ? `“${q}”` : ''].filter(Boolean).join(' · ');
+    html += `<div class="section">${esc(name)} · ${shown.length}개</div><ul class="list">${shown.map(itemHtml).join('')}</ul>`;
+  } else {
+    let last = null;
+    for (const m of shown) {
+      const sec = sectionOf(m.edited || m.created);
+      if (sec !== last) {
+        if (last !== null) html += '</ul>';
+        html += `<div class="section">${esc(sec)}</div><ul class="list">`;
+        last = sec;
       }
-      if (open) html += '</ul>';
+      html += itemHtml(m);
+    }
+    if (last !== null) html += '</ul>';
+  }
+
+  html += `<form class="composer" id="quickForm">
+      <div class="row"><textarea id="quick" rows="1" placeholder="떠오른 생각을 바로 적어요" aria-label="새 메모">${esc(draft)}</textarea>
+      <button class="send" type="submit" aria-label="담기" ${draft.trim() ? '' : 'disabled'}>${ICON.send}</button></div>
+      <span class="hint">첫 줄이 제목이 돼요 · 태그는 나중에</span>
+    </form>`;
+  $app.innerHTML = html;
+  $app.className = 'list-view';
+  const quick = document.getElementById('quick');
+  autoGrow(quick);
+  if (active) {
+    const el = document.getElementById(active);
+    if (el) {
+      el.focus();
+      if (typeof caret === 'number' && el.setSelectionRange) el.setSelectionRange(caret, caret);
     }
   }
-  html += `<button class="fab" id="new" aria-label="새 메모">${ICON.pen}</button>`;
-  $app.innerHTML = html;
   paintListHead();
+}
+
+// 목록 아래 입력창에서 바로 담기. 보낼 함에 넣고 노션으로 보낸다(연결이 없으면 기기에 남는다).
+function quickCreate() {
+  const el = document.getElementById('quick');
+  const text = normBody(el.value);
+  if (!text.trim()) return;
+  const at = text.indexOf('\n');
+  const key = `local-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  outbox[key] = {
+    id: null,
+    base: null,
+    next: { title: (at < 0 ? text : text.slice(0, at)).trim(), body: at < 0 ? '' : normBody(text.slice(at + 1)), tags: [], kind: null },
+    appends: [],
+    touched: new Date().toISOString(),
+  };
+  saveOutbox();
+  el.value = '';
+  state.quick = '';
+  state.mode = 'memo';
+  renderList();
+  document.getElementById('quick')?.focus();
+  flush(key).then(() => !cur && renderList());
 }
 
 function itemHtml(m) {
@@ -402,8 +485,13 @@ function shown() {
   return null;
 }
 
-function editorText(v) {
+function fullText(v) {
   return v ? v.title + (v.body ? `\n${v.body}` : '') : '';
+}
+function editorText(v) {
+  if (!v) return '';
+  const { head } = splitBody(v.body);
+  return v.title + (head ? `\n${head}` : '');
 }
 
 function renderMemo() {
@@ -416,30 +504,32 @@ function renderMemo() {
   const ready = cur.isNew || v;
 
   let html = `<div class="bar">
-      <button class="back" id="back">${ICON.back}메모</button>
+      <button class="back" id="back" aria-label="목록으로">${ICON.back}</button>
       <div class="right"><span class="status" id="status"></span>
         ${snap?.url ? `<a class="icon" href="${esc(snap.url)}" target="_blank" rel="noopener" aria-label="노션에서 원본 열기">${ICON.open}</a>` : ''}
         ${!cur.isNew || e?.id ? `<button class="icon" id="info" aria-label="태그와 정보" aria-expanded="${cur.info}">${ICON.info}</button>` : ''}
       </div></div>
-    <div class="dates" id="dates"></div>
     <div id="conflict"></div>
     <div id="infoPanel"></div>`;
 
   if (cur.loadError && !ready) html += `<p class="note">${esc(cur.loadError)}</p>`;
   if (!ready) html += `<p class="loading">${cur.loading ? '불러오는 중…' : '이 메모를 불러오지 못했어요.'}</p>`;
   else if (editable) {
-    html += plainOnly
-      ? `<div class="editor" id="ed" contenteditable="plaintext-only" spellcheck="true" data-placeholder="제목" role="textbox" aria-multiline="true" aria-label="메모. 첫 줄이 제목이에요"></div>`
-      : `<textarea class="editor" id="ed" placeholder="첫 줄이 제목이 돼요" aria-label="메모. 첫 줄이 제목이에요"></textarea>`;
+    html += `<div class="card main">${
+      plainOnly
+        ? `<div class="editor" id="ed" contenteditable="plaintext-only" spellcheck="true" data-placeholder="제목" role="textbox" aria-multiline="true" aria-label="메모. 첫 줄이 제목이에요"></div>`
+        : `<textarea class="editor" id="ed" placeholder="첫 줄이 제목이 돼요" aria-label="메모. 첫 줄이 제목이에요"></textarea>`
+    }<div class="meta" id="meta"></div></div><div id="tail"></div>`;
   } else {
-    html += `<input class="title-input" id="title" aria-label="제목" value="${esc(v.title)}" placeholder="제목">
+    html += `<div class="card main"><input class="title-input" id="title" aria-label="제목" value="${esc(v.title)}" placeholder="제목">
+      <div class="readonly">${(snap.blocks || []).map(lineHtml).join('')}</div><div class="meta" id="meta"></div></div>
       <p class="note">표·이미지 같은 노션 서식이 있어 본문은 노션에서 고쳐요. 제목·태그 수정과 이어 쓰기는 여기서 돼요.
-        ${snap.url ? `<a class="link" href="${esc(snap.url)}" target="_blank" rel="noopener">원본 보기</a>` : ''}</p>
-      <div class="readonly">${(snap.blocks || []).map(lineHtml).join('')}</div>`;
+        ${snap.url ? `<a class="link" href="${esc(snap.url)}" target="_blank" rel="noopener">원본 보기</a>` : ''}</p>`;
   }
   if (ready && cur.loadError) html += `<p class="note">${esc(cur.loadError)}</p>`;
-  html += `<div id="cont"></div>`;
+  html += `<div id="pend"></div><div id="cont"></div>`;
   $app.innerHTML = html;
+  $app.className = 'memo-view';
 
   if (ready && editable) {
     const ed = document.getElementById('ed');
@@ -471,7 +561,9 @@ function readEditor() {
   if (ed) {
     const text = (ed.tagName === 'TEXTAREA' ? ed.value : ed.innerText).replace(/\r\n?/g, '\n').replace(/ /g, ' ');
     const at = text.indexOf('\n');
-    return { title: (at < 0 ? text : text.slice(0, at)).trim(), body: normBody(at < 0 ? '' : text.slice(at + 1)) };
+    const head = normBody(at < 0 ? '' : text.slice(at + 1));
+    const { tail } = splitBody(shown()?.body || '');
+    return { title: (at < 0 ? text : text.slice(0, at)).trim(), body: tail ? (head ? `${head}\n${tail}` : tail) : head };
   }
   const t = document.getElementById('title');
   return { title: t ? t.value.trim() : '', body: cur.snap?.body || '' };
@@ -520,7 +612,7 @@ function onEdit(patch = {}) {
   const e = ensureEntry();
   if (e.conflict) return;
   const prev = shown() || { tags: [], kind: null };
-  e.next = { ...readEditor(), tags: prev.tags || [], kind: prev.kind || null, ...patch };
+  e.next = { ...readEditor(), tags: prev.tags || [], kind: prev.kind || null, status: prev.status || null, ...patch };
   e.touched = new Date().toISOString();
   saveOutbox();
   if (!e.id && !e.next.title && !e.next.body) {
@@ -562,13 +654,21 @@ function paintSide() {
   if (!cur) return;
   const snap = cur.snap;
   const e = outbox[cur.key];
-  const dates = document.getElementById('dates');
-  if (dates) {
+  const v0 = shown();
+  const meta = document.getElementById('meta');
+  if (meta) {
     const parts = [];
-    if (snap?.created) parts.push(`처음 담음 ${when(snap.created, true)}`);
-    if (snap?.lastAppended) parts.push(`마지막 이어 씀 ${when(snap.lastAppended, true)}`);
-    else if (snap?.edited && snap.edited !== snap.created) parts.push(`수정 ${when(snap.edited, true)}`);
-    dates.textContent = parts.join(' · ');
+    if (snap?.created) parts.push(when(snap.created, true));
+    if (v0?.status && (v0.status === '보관' || v0.status === '프로젝트 연결')) parts.push('기록');
+    for (const t of v0?.tags || []) parts.push(`#${t}`);
+    meta.textContent = parts.join(' · ');
+  }
+  // 이어 쓴 생각: 원래 메모 아래에 한 칸씩
+  const tailEl = document.getElementById('tail');
+  if (tailEl) {
+    tailEl.innerHTML = tailEntries(splitBody(v0?.body || '').tail)
+      .map((x) => `<div class="card more"><div class="txt">${esc(x.text)}</div><div class="meta">${esc(fmtMark(x.mark))} 이어 씀</div></div>`)
+      .join('');
   }
 
   const c = document.getElementById('conflict');
@@ -579,8 +679,8 @@ function paintSide() {
       c.innerHTML = `<div class="conflict" role="alert">
         <div><b>노션에서도 이 메모가 바뀌었어요.</b> 어느 쪽도 지우지 않았어요. 어떻게 할지 골라 주세요.</div>
         <div class="two">
-          <div class="ver"><div class="lab">노션 버전</div>${esc(editorText(r))}${r.tags?.length ? `\n\n${esc(r.tags.map((t) => `#${t}`).join(' '))}` : ''}</div>
-          <div class="ver"><div class="lab">이 기기에서 쓴 버전</div>${esc(editorText(mine))}${mine?.tags?.length ? `\n\n${esc(mine.tags.map((t) => `#${t}`).join(' '))}` : ''}</div>
+          <div class="ver"><div class="lab">노션 버전</div>${esc(fullText(r))}${r.tags?.length ? `\n\n${esc(r.tags.map((t) => `#${t}`).join(' '))}` : ''}</div>
+          <div class="ver"><div class="lab">이 기기에서 쓴 버전</div>${esc(fullText(mine))}${mine?.tags?.length ? `\n\n${esc(mine.tags.map((t) => `#${t}`).join(' '))}` : ''}</div>
         </div>
         <div class="acts">
           <button class="btn" data-resolve="both">둘 다 남기기</button>
@@ -608,32 +708,39 @@ function paintSide() {
       info.innerHTML = `<div class="info">
         <div><div class="lab">태그</div><div class="chips">${tags.map((t) => `<button class="chip ${v.tags?.includes(t) ? 'on' : ''}" data-settag="${esc(t)}">#${esc(t)}</button>`).join('') || '<span class="pending">노션 목록을 불러오면 태그를 고를 수 있어요.</span>'}</div></div>
         ${kinds.length ? `<div><div class="lab">분류</div><div class="chips small">${kinds.map((k) => `<button class="chip ${v.kind === k ? 'on' : ''}" data-setkind="${esc(k)}">${esc(k)}</button>`).join('')}</div></div>` : ''}
+        ${(state.meta.statuses || []).includes('보관') ? `<div><div class="lab">단계</div><div class="chips small">
+          <button class="chip ${!isRecord(v) ? 'on' : ''}" data-setstatus="새로 담음">메모</button>
+          <button class="chip ${isRecord(v) ? 'on' : ''}" data-setstatus="보관">기록</button></div></div>` : ''}
         ${rows.length ? `<div class="kv">${rows.map(([k, val]) => `<span>${k}</span><span>${val}</span>`).join('')}</div>` : ''}
         ${snap?.url ? `<a class="link" href="${esc(snap.url)}" target="_blank" rel="noopener">노션에서 원본 열기</a>` : ''}
       </div>`;
     } else info.innerHTML = '';
   }
 
-  // 이어 쓰기: 입력창은 한 번만 그리고(쓰는 중 포커스 유지), 보내는 중인 덧붙임만 다시 그린다.
+  // 이어 쓰기: 아래 입력창은 한 번만 그리고(쓰는 중 포커스 유지), 보내는 중인 덧붙임만 다시 그린다.
   const cont = document.getElementById('cont');
   if (cont) {
     const id = e?.id || (!cur.isNew && cur.key);
     if (id && !document.getElementById('more')) {
-      cont.innerHTML = `<div class="cont">
-        <div id="pend"></div>
-        <div class="lab">생각 이어 쓰기</div>
-        <textarea id="more" placeholder="오늘 떠오른 생각을 덧붙여요" aria-label="생각 이어 쓰기"></textarea>
-        <div class="row"><span class="pending">처음 담은 날짜는 그대로, 덧붙인 시각이 함께 남아요.</span><button class="btn" id="append" disabled>덧붙이기</button></div>
-      </div>`;
-    }
-    const pend = document.getElementById('pend');
-    if (pend) {
-      const off = status[cur.key]?.s === 'offline';
-      pend.innerHTML = (e?.appends || [])
-        .map((a) => `<div class="mark">${esc(when(a.at, true))} · ${off ? '기기에 보관됨' : '보내는 중'}</div><div class="readonly">${esc(a.text)}</div>`)
-        .join('');
+      cont.innerHTML = `<form class="composer" id="moreForm">
+        <div class="row"><textarea id="more" rows="1" placeholder="이 생각에 이어 쓰기" aria-label="생각 이어 쓰기"></textarea>
+        <button class="send" type="submit" id="append" aria-label="덧붙이기" disabled>${ICON.send}</button></div>
+      </form>`;
     }
   }
+  const pend = document.getElementById('pend');
+  if (pend) {
+    const off = status[cur.key]?.s === 'offline';
+    pend.innerHTML = (e?.appends || [])
+      .map((a) => `<div class="card more pending-card"><div class="txt">${esc(a.text)}</div><div class="meta">${esc(when(a.at, true))} · ${off ? '기기에 보관됨' : '보내는 중'}</div></div>`)
+      .join('');
+  }
+}
+
+function fmtMark(mark) {
+  // "2026.11.01 14:30" → 오늘 14:30 / 11월 1일 14:30
+  const m = mark.match(/(\d{4})\.(\d{2})\.(\d{2}) (\d{2}):(\d{2})/);
+  return m ? when(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:00+09:00`, true) : mark;
 }
 
 function resolveConflict(how) {
@@ -672,6 +779,8 @@ function appendMore() {
   e.touched = new Date().toISOString();
   saveOutbox();
   el.value = '';
+  autoGrow(el);
+  document.getElementById('append').disabled = true;
   setStatus(cur.key, 'saving');
   paintSide();
   flush(cur.key);
@@ -739,6 +848,21 @@ $app.addEventListener('click', (ev) => {
   } else if (t.dataset.kind !== undefined) {
     state.filter.kind = state.filter.kind === t.dataset.kind ? null : t.dataset.kind;
     renderList();
+  } else if (t.dataset.mode) {
+    state.mode = t.dataset.mode;
+    state.filter.tag = null;
+    state.filter.kind = null;
+    renderList();
+  } else if (t.id === 'searchBtn') {
+    const open = !(state.searchOpen || state.filter.q || state.filter.tag || state.filter.kind);
+    state.searchOpen = open;
+    if (!open) state.filter = { tag: null, kind: null, q: '' };
+    renderList();
+    if (open) document.getElementById('q')?.focus();
+  } else if (t.dataset.setstatus) {
+    onEdit({ status: t.dataset.setstatus });
+    paintSide();
+    toast(t.dataset.setstatus === '보관' ? '기록으로 옮겼어요' : '메모로 되돌렸어요');
   } else if (t.id === 'back') back();
   else if (t.id === 'info') {
     cur.info = !cur.info;
@@ -754,7 +878,6 @@ $app.addEventListener('click', (ev) => {
     onEdit({ kind: v.kind === t.dataset.setkind ? null : t.dataset.setkind });
     paintSide();
   } else if (t.dataset.resolve) resolveConflict(t.dataset.resolve);
-  else if (t.id === 'append') appendMore();
   else if (t.id === 'retry') {
     document.getElementById('status').dataset.shown = '';
     flush(cur.key);
@@ -774,16 +897,24 @@ $app.addEventListener('input', (ev) => {
     if (t.tagName === 'TEXTAREA') autoGrow(t);
     onEdit();
   } else if (t.id === 'more') {
+    autoGrow(t);
     document.getElementById('append').disabled = !t.value.trim();
+  } else if (t.id === 'quick') {
+    autoGrow(t);
+    state.quick = t.value;
+    t.form.querySelector('.send').disabled = !t.value.trim();
   }
 });
 
 $app.addEventListener('keydown', (ev) => {
   if (ev.target.id === 'more' && ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) appendMore();
+  if (ev.target.id === 'quick' && ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) quickCreate();
   if (ev.target.id === 'title' && ev.key === 'Enter') ev.target.blur();
 });
 
 $app.addEventListener('submit', (ev) => {
+  if (ev.target.id === 'quickForm') return ev.preventDefault(), quickCreate();
+  if (ev.target.id === 'moreForm') return ev.preventDefault(), appendMore();
   if (ev.target.id !== 'tokenForm') return;
   ev.preventDefault();
   token = document.getElementById('tokenInput').value.trim();

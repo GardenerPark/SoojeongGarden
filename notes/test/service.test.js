@@ -11,7 +11,7 @@ function setup() {
   const svc = createService({ notion: fake, dbId: fake.dbId, clock: () => now });
   return { fake, run: svc.run, tick: (min) => (now = new Date(now.getTime() + min * 60000)) };
 }
-const asBase = (s) => ({ title: s.title, body: s.body, tags: s.tags, kind: s.kind });
+const asBase = (s) => ({ title: s.title, body: s.body, tags: s.tags, kind: s.kind, status: s.status });
 
 test('목록은 최근 수정 순이고, 한 줄 생각이 없으면 본문 앞부분을 미리보기로 준다', async () => {
   const { fake, run, tick } = setup();
@@ -91,4 +91,13 @@ test('표·이미지가 있는 메모는 본문을 고치지 않지만 이어 �
   assert.equal(a.lastAppended, '2026-11-01T14:30:00+09:00');
   assert.deepEqual(fake.lines(id).slice(-3), ['paragraph:↳ 2026.11.01 14:30', 'paragraph:오늘 다시 보니', 'paragraph:좋다']);
   assert.equal(a.blocks.length, 5);
+});
+
+test('앱에서 새로 쓴 메모는 "새로 담음"이고, 정리 상태를 바꿔 기록으로 옮길 수 있다', async () => {
+  const { run } = setup();
+  const m = await run('create', { next: { title: '빨리 쓴 것', body: '' } });
+  assert.equal(m.status, '새로 담음');
+  const r = await run('save', { id: m.id, base: asBase(m), next: { ...asBase(m), status: '보관' } });
+  assert.equal(r.status, '보관');
+  await assert.rejects(run('save', { id: m.id, base: asBase(r), next: { ...asBase(r), status: '없는 상태' } }), /정리 상태/);
 });
